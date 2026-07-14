@@ -28,6 +28,7 @@ import {
   processMetaWebhook,
   igConfigured,
   fbConfigured,
+  igSubscribeApp,
 } from "./lib/social.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -146,6 +147,41 @@ app.delete("/api/automation/rules/:id", requireDash, (req, res) => {
   res.json({ ok });
 });
 
+// (Re)subscreve a conta de Instagram aos webhooks de comentarios. Idempotente;
+// util depois de trocar o token do Instagram.
+app.post("/api/ig/subscribe", requireDash, async (_req, res) => {
+  const r = await igSubscribeApp();
+  res.status(r.ok ? 200 : 400).json(r);
+});
+
+// -----------------------------------------------------------------------------
+//  Paginas exigidas pela Meta para por a app em Live Mode.
+// -----------------------------------------------------------------------------
+const legalPage = (title, body) => `<!DOCTYPE html><html lang="pt-PT"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${title}</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:680px;margin:0 auto;padding:40px 20px;line-height:1.65;color:#16182d}h1{font-size:24px}h2{font-size:17px;margin-top:26px}p{margin:10px 0}</style>
+</head><body><h1>${title}</h1>${body}
+<p style="margin-top:30px;color:#6b6e85;font-size:13px">Última atualização: julho de 2026.</p></body></html>`;
+
+app.get("/privacy", (_req, res) => {
+  res.send(legalPage("Política de Privacidade", `
+<p>Esta aplicação («Replyzo») é uma ferramenta privada de gestão de comentários, utilizada exclusivamente pelo proprietário das contas de redes sociais a que está ligada.</p>
+<h2>Dados tratados</h2>
+<p>A aplicação recebe da Meta notificações de comentários públicos feitos nas publicações das contas ligadas (texto do comentário, nome de utilizador de quem comentou e identificadores técnicos). Estes dados são usados apenas para responder automaticamente ao comentário e/ou enviar uma mensagem direta a quem o escreveu.</p>
+<h2>Conservação</h2>
+<p>Guardamos apenas registos técnicos mínimos (identificador do comentário e resultado da resposta) para evitar respostas duplicadas. Não vendemos, partilhamos nem cedemos dados a terceiros.</p>
+<h2>Contacto</h2>
+<p>Para questões sobre privacidade ou para pedir a eliminação de dados, contacta o proprietário através da conta de Instagram ou Página de Facebook ligada a esta aplicação, ou consulta a página de <a href="/data-deletion">eliminação de dados</a>.</p>`));
+});
+
+app.get("/data-deletion", (_req, res) => {
+  res.send(legalPage("Eliminação de Dados", `
+<p>Esta aplicação guarda apenas registos técnicos mínimos sobre comentários públicos (identificador do comentário e resultado da resposta automática). Não guarda mensagens privadas nem dados de perfil.</p>
+<h2>Como pedir a eliminação</h2>
+<p>Envia uma mensagem direta à conta de Instagram ou Página de Facebook ligada a esta aplicação a pedir a eliminação dos teus registos, indicando o teu nome de utilizador. Os registos associados serão eliminados no prazo de 30 dias.</p>`));
+});
+
 // Dashboard (o HTML/JS sao publicos; os DADOS exigem a senha acima).
 app.get(["/", "/dashboard"], (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "dashboard.html"));
@@ -162,4 +198,11 @@ app.listen(PORT, () => {
   }
   if (!igConfigured()) console.log("  [aviso] Instagram por configurar (IG_USER_ID / IG_ACCESS_TOKEN).");
   if (!fbConfigured()) console.log("  [aviso] Facebook por configurar (PAGE_ACCESS_TOKEN).");
+
+  // Garante a subscricao da conta IG aos webhooks de comentarios (idempotente).
+  if (igConfigured()) {
+    igSubscribeApp().then((r) =>
+      console.log(r.ok ? "  [ig] conta subscrita aos comentarios ✓" : `  [ig] subscricao falhou: ${r.error}`)
+    );
+  }
 });
