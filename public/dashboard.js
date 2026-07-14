@@ -1,0 +1,403 @@
+/* =========================================================================
+   Replyzo — logica do cliente.
+   - Porta de entrada por senha (guardada em sessionStorage).
+   - Le /api/automation com o cabecalho x-dash-key.
+   - Vistas: overview | automations | activity | connections.
+   - Editor em modal com pre-visualizacao ao vivo (bolhas de chat).
+   ========================================================================= */
+
+const KEY_STORE = "social_key_v1";
+
+const gate = document.getElementById("gate");
+const app = document.getElementById("app");
+const mainView = document.getElementById("main-view");
+
+let data = null; // ultimo payload de /api/automation
+let currentView = "overview";
+let editingId = null; // id da regra em edicao (null = nova)
+let armedDelete = null; // { id, timer } — apagar em dois passos
+
+const VIEW_TITLES = {
+  overview: ["Visão geral", "Comentários → resposta + DM, em piloto automático"],
+  automations: ["Automações", "Palavras-chave e o que acontece quando alguém as comenta"],
+  activity: ["Atividade", "Todos os comentários tratados, do mais recente ao mais antigo"],
+  connections: ["Ligações", "Estado das contas Instagram e Facebook"],
+};
+const MATCH_NAMES = { contains: "contém", exact: "exato", starts: "começa por" };
+
+const IG_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="17.6" cy="6.4" r="1.3" fill="currentColor" stroke="none"/></svg>`;
+const FB_SVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 8.5V6.8c0-.8.5-1 1.2-1H17V2.5h-2.6C11.7 2.5 10.5 4 10.5 6.4v2.1H8v3.4h2.5v9.6H14v-9.6h2.6l.4-3.4H14z"/></svg>`;
+const pbadge = (p) => `<span class="pbadge ${p === "ig" ? "ig" : "fb"}">${p === "ig" ? IG_SVG : FB_SVG}</span>`;
+
+// ---- Arranque ---------------------------------------------------------------
+function boot() {
+  bindChrome();
+  const key = sessionStorage.getItem(KEY_STORE);
+  if (key) {
+    app.hidden = false;
+    load();
+  } else {
+    showGate();
+  }
+}
+
+function showGate(errMsg) {
+  gate.hidden = false;
+  app.hidden = true;
+  document.getElementById("gate-err").textContent = errMsg || "";
+  const form = document.getElementById("gate-form");
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const pass = document.getElementById("gate-pass").value.trim();
+    if (!pass) return;
+    sessionStorage.setItem(KEY_STORE, pass);
+    gate.hidden = true;
+    app.hidden = false;
+    load();
+  };
+  document.getElementById("gate-pass").focus();
+}
+
+// ---- Carregamento -----------------------------------------------------------
+async function load() {
+  if (!data) mainView.innerHTML = `<div class="card"><div class="empty">A carregar…</div></div>`;
+  try {
+    const res = await fetch("/api/automation", {
+      headers: { "x-dash-key": sessionStorage.getItem(KEY_STORE) || "" },
+    });
+    if (res.status === 401) { sessionStorage.removeItem(KEY_STORE); showGate("Senha incorreta. Tenta de novo."); return; }
+    if (!res.ok) throw new Error();
+    data = await res.json();
+    renderSidebarDots();
+    renderView();
+  } catch {
+    mainView.innerHTML = `<div class="card"><div class="empty"><h3>Não foi possível carregar</h3><p>Verifica a ligação e tenta de novo.</p><button class="btn btn-ghost" onclick="location.reload()">Recarregar</button></div></div>`;
+  }
+}
+
+function renderSidebarDots() {
+  document.getElementById("dot-ig").classList.toggle("on", !!data.igConfigured);
+  document.getElementById("dot-fb").classList.toggle("on", !!data.fbConfigured);
+}
+
+// ---- Navegação ----------------------------------------------------------------
+function bindChrome() {
+  document.getElementById("nav").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-view]");
+    if (btn) switchView(btn.dataset.view);
+  });
+  document.getElementById("refresh").addEventListener("click", load);
+  document.getElementById("new-rule").addEventListener("click", () => openEditor(null));
+  bindEditor();
+
+  // Delegação: switches, editar, apagar, CTAs de vistas vazias.
+  mainView.addEventListener("click", onMainClick);
+  mainView.addEventListener("change", async (e) => {
+    const sw = e.target.closest("input[data-toggle]");
+    if (!sw) return;
+    await api("/api/automation/rules", { method: "POST", body: { id: Number(sw.dataset.toggle), active: sw.checked ? 1 : 0 } });
+    load();
+  });
+}
+
+function switchView(view) {
+  currentView = view;
+  document.querySelectorAll("#nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
+  const [t, c] = VIEW_TITLES[view];
+  document.getElementById("page-title").textContent = t;
+  document.getElementById("page-crumb").textContent = c;
+  disarmDelete();
+  renderView();
+}
+
+function renderView() {
+  if (!data) return;
+  if (currentView === "overview") renderOverview();
+  else if (currentView === "automations") renderAutomations();
+  else if (currentView === "activity") renderActivity();
+  else renderConnections();
+}
+
+async function onMainClick(e) {
+  const goAutomations = e.target.closest("[data-go-new]");
+  if (goAutomations) { openEditor(null); return; }
+  const goConn = e.target.closest("[data-go-connections]");
+  if (goConn) { switchView("connections"); return; }
+
+  const edit = e.target.closest("button[data-edit]");
+  if (edit) { openEditor(data.rules.find((r) => r.id === Number(edit.dataset.edit))); return; }
+
+  const del = e.target.closest("button[data-del]");
+  if (del) {
+    const id = Number(del.dataset.del);
+    if (armedDelete?.id === id) {
+      disarmDelete();
+      await api(`/api/automation/rules/${id}`, { method: "DELETE" });
+      load();
+    } else {
+      disarmDelete();
+      del.classList.add("btn", "btn-danger-soft");
+      del.style.width = "auto";
+      del.textContent = "Apagar?";
+      armedDelete = { id, timer: setTimeout(() => { disarmDelete(); renderView(); }, 3500) };
+    }
+  }
+}
+
+function disarmDelete() {
+  if (armedDelete) { clearTimeout(armedDelete.timer); armedDelete = null; }
+}
+
+// ---- Vistas -------------------------------------------------------------------
+const fmtInt = new Intl.NumberFormat("pt-PT");
+
+function kpisHtml() {
+  const s = data.stats || {};
+  const active = (data.rules || []).filter((r) => r.active).length;
+  return `<div class="kpis">
+    <div class="kpi hero"><div class="k">Automações ativas</div><div class="v">${fmtInt.format(active)}</div><div class="d">de ${fmtInt.format((data.rules || []).length)} criadas</div></div>
+    <div class="kpi"><div class="k">Comentários tratados</div><div class="v">${fmtInt.format(s.total || 0)}</div><div class="d">${fmtInt.format(s.today || 0)} hoje</div></div>
+    <div class="kpi"><div class="k">DMs enviadas</div><div class="v">${fmtInt.format(s.dms || 0)}</div><div class="d">respostas públicas: ${fmtInt.format(s.publics || 0)}</div></div>
+    <div class="kpi"><div class="k">Erros</div><div class="v">${fmtInt.format(s.errors || 0)}</div><div class="d">${s.errors ? "vê a Atividade" : "tudo em ordem"}</div></div>
+  </div>`;
+}
+
+function setupNoticeHtml() {
+  if (data.igConfigured || data.fbConfigured) return "";
+  return `<div class="card section-gap" style="border-color:#f3dfae;background:#fffbf0">
+    <div class="act-row" style="border:none">
+      <div class="act-ico err" style="background:var(--warn-soft);color:var(--warn)">!</div>
+      <div class="act-mid">
+        <div class="act-title">Nenhuma conta ligada ainda</div>
+        <div class="act-sub" style="white-space:normal">As automações só disparam depois de ligares o Instagram ou o Facebook.</div>
+      </div>
+      <button class="btn btn-ghost" data-go-connections>Ligar contas</button>
+    </div>
+  </div>`;
+}
+
+function renderOverview() {
+  const recent = (data.events || []).slice(0, 6);
+  mainView.innerHTML = `
+    ${setupNoticeHtml()}
+    ${kpisHtml()}
+    <div class="card">
+      <div class="card-head"><h2>Atividade recente</h2><div class="spacer"></div><div class="sub">últimos ${recent.length || 0} comentários</div></div>
+      ${recent.length ? recent.map(actRowHtml).join("") : emptyActivityHtml()}
+    </div>`;
+}
+
+function renderAutomations() {
+  const rules = data.rules || [];
+  mainView.innerHTML = `
+    <div class="card">
+      <div class="card-head"><h2>As tuas automações</h2><div class="spacer"></div><div class="sub">${fmtInt.format(rules.length)} no total</div></div>
+      ${rules.length ? rules.map(ruleRowHtml).join("") : `
+        <div class="empty">
+          <div class="big">⚡</div>
+          <h3>Ainda não tens automações</h3>
+          <p>Escolhe uma palavra-chave e o que responder quando alguém a comentar numa publicação tua.</p>
+          <button class="btn btn-primary" data-go-new>Criar a primeira</button>
+        </div>`}
+    </div>`;
+}
+
+function ruleRowHtml(r) {
+  const does = [r.reply_public ? "responde no comentário" : "", r.dm_text ? "envia DM" : ""].filter(Boolean).join(" + ") || "sem ação";
+  return `<div class="rule-row ${r.active ? "" : "off"}">
+    ${pbadge(r.platform)}
+    <div class="rule-mid">
+      <div class="rule-kw"><span class="kw-chip">${escapeHtml(r.keyword)}</span></div>
+      <div class="rule-meta">${MATCH_NAMES[r.match_type] || r.match_type} · ${does}</div>
+    </div>
+    <div class="rule-acts">
+      <label class="switch" title="${r.active ? "Desativar" : "Ativar"}">
+        <input type="checkbox" data-toggle="${r.id}" ${r.active ? "checked" : ""} />
+        <span class="track"></span>
+      </label>
+      <button class="icon-btn" data-edit="${r.id}" title="Editar" aria-label="Editar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+      </button>
+      <button class="icon-btn" data-del="${r.id}" title="Apagar" aria-label="Apagar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </button>
+    </div>
+  </div>`;
+}
+
+function renderActivity() {
+  const events = data.events || [];
+  mainView.innerHTML = `
+    <div class="card">
+      <div class="card-head"><h2>Comentários tratados</h2><div class="spacer"></div><div class="sub">${fmtInt.format(events.length)} mais recentes</div></div>
+      ${events.length ? events.map(actRowHtml).join("") : emptyActivityHtml()}
+    </div>`;
+}
+
+function emptyActivityHtml() {
+  return `<div class="empty">
+    <div class="big">💬</div>
+    <h3>Ainda sem atividade</h3>
+    <p>Assim que alguém comentar uma das tuas palavras-chave, o resultado aparece aqui.</p>
+  </div>`;
+}
+
+function actRowHtml(ev) {
+  const rule = (data.rules || []).find((r) => r.id === ev.rule_id);
+  const kw = rule ? rule.keyword : "regra apagada";
+  const plat = ev.platform === "ig" ? "Instagram" : "Facebook";
+  const pills = ev.ok
+    ? [ev.did_public ? `<span class="mini-pill reply">respondeu</span>` : "", ev.did_dm ? `<span class="mini-pill dm">DM enviada</span>` : ""].filter(Boolean).join("")
+    : `<span class="mini-pill err">falhou</span>`;
+  const sub = ev.ok ? `${plat} · comentário ${escapeHtml(ev.comment_id || "")}` : escapeHtml(ev.error || "erro desconhecido");
+  return `<div class="act-row">
+    <div class="act-ico ${ev.ok ? "ok" : "err"}">${ev.ok ? "✓" : "✕"}</div>
+    <div class="act-mid">
+      <div class="act-title"><span class="kw-chip">${escapeHtml(kw)}</span> ${pills}</div>
+      <div class="act-sub" title="${escapeHtml(ev.error || "")}">${sub}</div>
+    </div>
+    <div class="act-time">${relTime(ev.created)}</div>
+  </div>`;
+}
+
+function renderConnections() {
+  const card = (p, name, on, helpOn, helpOff) => `
+    <div class="card conn-card">
+      <div class="conn-top">
+        ${pbadge(p)}
+        <div>
+          <div class="conn-name">${name}</div>
+          <div class="conn-state ${on ? "on" : "off"}">${on ? "● Ligado" : "● Por configurar"}</div>
+        </div>
+      </div>
+      <div class="conn-help">${on ? helpOn : helpOff}</div>
+    </div>`;
+  mainView.innerHTML = `<div class="conn-grid">
+    ${card("ig", "Instagram", data.igConfigured,
+      "A responder a comentários e a enviar DMs. Se trocares o token na Meta, atualiza o <code>.env</code> e reinicia.",
+      "Preenche <code>IG_USER_ID</code> e <code>IG_ACCESS_TOKEN</code> no <code>.env</code> e reinicia o servidor. Os passos completos estão no README (secção «Setup na Meta»).")}
+    ${card("fb", "Facebook", data.fbConfigured,
+      "A responder a comentários da Página.",
+      "Preenche <code>PAGE_ID</code> e <code>PAGE_ACCESS_TOKEN</code> no <code>.env</code> e reinicia o servidor. Os passos completos estão no README (secção «Setup na Meta»).")}
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="card-head"><h2>Webhook</h2></div>
+    <div class="conn-help" style="padding:16px 18px">
+      Aponta o webhook da Meta para <code>/webhooks/meta</code> no teu domínio, com o <em>verify token</em> igual ao
+      <code>META_VERIFY_TOKEN</code> do <code>.env</code>. Subscreve os campos <code>comments</code> (Instagram) e <code>feed</code> (Facebook).
+    </div>
+  </div>`;
+}
+
+// ---- Editor (modal) -------------------------------------------------------------
+const editor = document.getElementById("editor");
+const editorForm = document.getElementById("editor-form");
+
+function bindEditor() {
+  document.getElementById("editor-close").addEventListener("click", closeEditor);
+  document.getElementById("editor-cancel").addEventListener("click", closeEditor);
+  editor.addEventListener("click", (e) => { if (e.target === editor) closeEditor(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !editor.hidden) closeEditor(); });
+
+  editorForm.addEventListener("input", syncPreview);
+  editorForm.addEventListener("change", syncPreview);
+
+  editorForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("editor-msg");
+    const body = {
+      ...(editingId ? { id: editingId } : {}),
+      platform: editorForm.platform.value,
+      keyword: editorForm.keyword.value.trim(),
+      match_type: editorForm.match_type.value,
+      reply_public: editorForm.reply_public.value.trim(),
+      dm_text: editorForm.dm_text.value.trim(),
+    };
+    if (!body.keyword) { msg.textContent = "Falta a palavra que dispara."; return; }
+    if (!body.reply_public && !body.dm_text) { msg.textContent = "Escreve pelo menos a resposta ou a DM."; return; }
+    msg.textContent = "";
+    const r = await api("/api/automation/rules", { method: "POST", body });
+    if (r && r.ok) { closeEditor(); load(); }
+    else msg.textContent = (r && r.error) || "Não foi possível guardar. Tenta de novo.";
+  });
+}
+
+function openEditor(rule) {
+  editingId = rule ? rule.id : null;
+  document.getElementById("editor-title").textContent = rule ? "Editar automação" : "Nova automação";
+  document.getElementById("editor-save").textContent = rule ? "Guardar alterações" : "Guardar automação";
+  document.getElementById("editor-msg").textContent = "";
+  editorForm.reset();
+  editorForm.platform.value = rule?.platform || "ig";
+  editorForm.keyword.value = rule?.keyword || "";
+  editorForm.match_type.value = rule?.match_type || "contains";
+  editorForm.reply_public.value = rule?.reply_public || "";
+  editorForm.dm_text.value = rule?.dm_text || "";
+  syncPreview();
+  editor.hidden = false;
+  document.getElementById("f-keyword").focus();
+}
+
+function closeEditor() {
+  editor.hidden = true;
+  editingId = null;
+}
+
+// Pré-visualização ao vivo: comentário → resposta → DM, como no Instagram.
+function syncPreview() {
+  const isFb = editorForm.platform.value === "fb";
+  document.getElementById("f-dm-field").hidden = isFb;
+  document.getElementById("pv-dm-block").hidden = isFb;
+
+  const kw = editorForm.keyword.value.trim();
+  const reply = editorForm.reply_public.value.trim();
+  const dm = editorForm.dm_text.value.trim();
+
+  document.getElementById("pv-comment").textContent = kw || "palavra-chave";
+  setBubble("pv-reply", reply, "sem resposta pública");
+  setBubble("pv-dm", dm, "sem mensagem privada");
+  document.getElementById("pv-reply-wrap").hidden = false;
+}
+
+function setBubble(id, text, placeholder) {
+  const el = document.getElementById(id);
+  el.textContent = text || placeholder;
+  el.classList.toggle("ph", !text);
+}
+
+// ---- Utilitários ------------------------------------------------------------
+async function api(url, { method = "GET", body } = {}) {
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        "x-dash-key": sessionStorage.getItem(KEY_STORE) || "",
+        ...(body ? { "Content-Type": "application/json" } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    return await res.json().catch(() => null);
+  } catch {
+    return null;
+  }
+}
+
+function relTime(sec) {
+  if (!sec) return "";
+  const diff = Math.floor(Date.now() / 1000) - sec;
+  if (diff < 60) return "agora";
+  if (diff < 3600) return `há ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `há ${Math.floor(diff / 3600)} h`;
+  if (diff < 7 * 86400) return `há ${Math.floor(diff / 86400)} d`;
+  return new Date(sec * 1000).toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+boot();

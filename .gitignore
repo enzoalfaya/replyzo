@@ -1,0 +1,7 @@
+node_modules/
+.env
+*.log
+.DS_Store
+
+# Dados locais (BD SQLite). Em produção vivem no disco persistente do Render.
+data/

@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#131426" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Replyzo — Automações de comentários</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f7f7fb;
+        --surface: #ffffff;
+        --ink: #16182d;
+        --muted: #6b6e85;
+        --line: #e6e7f0;
+        --primary: #5b5bd6;
+        --primary-dark: #4747c2;
+        --primary-soft: #eeeefb;
+        --sidebar: #131426;
+        --ok: #18a058;
+        --ok-soft: #e6f7ee;
+        --warn: #b7791f;
+        --warn-soft: #fdf3dc;
+        --danger: #e5484d;
+        --danger-soft: #fdebec;
+        --ig: linear-gradient(45deg, #f58529, #dd2a7b, #8134af);
+        --fb: #0866ff;
+        --radius: 14px;
+        --shadow: 0 1px 2px rgba(22, 24, 45, 0.05), 0 8px 24px rgba(22, 24, 45, 0.06);
+      }
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      html, body { margin: 0; }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 14px;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: inherit; }
+      button { font-family: inherit; }
+      :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 6px; }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+      }
+
+      /* ================= Sidebar ================= */
+      .shell { display: flex; min-height: 100vh; }
+      .side {
+        width: 228px; flex: 0 0 auto; background: var(--sidebar); color: #fff;
+        display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh;
+      }
+      .logo {
+        display: flex; align-items: center; gap: 10px; padding: 20px 18px 16px;
+        font-family: "Space Grotesk", Inter, sans-serif; font-size: 18px; font-weight: 700; letter-spacing: -0.01em;
+      }
+      .logo .mark {
+        width: 30px; height: 30px; border-radius: 9px; flex: 0 0 auto;
+        background: linear-gradient(135deg, #7c7cf0, #5b5bd6 55%, #dd2a7b 130%);
+        display: grid; place-items: center; color: #fff; font-size: 15px;
+        box-shadow: 0 4px 12px rgba(91, 91, 214, 0.45);
+      }
+      .side nav { padding: 6px 10px; display: flex; flex-direction: column; gap: 2px; }
+      .side nav button {
+        display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+        background: transparent; border: none; color: rgba(255, 255, 255, 0.62);
+        font-size: 13.5px; font-weight: 600; padding: 10px 12px; border-radius: 10px; cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+      }
+      .side nav button svg { width: 17px; height: 17px; flex: 0 0 auto; opacity: 0.9; }
+      .side nav button:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
+      .side nav button.active { background: var(--primary); color: #fff; box-shadow: 0 4px 14px rgba(91, 91, 214, 0.4); }
+      .side .foot {
+        margin-top: auto; padding: 14px 18px 16px; border-top: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex; flex-direction: column; gap: 8px;
+      }
+      .conn-dot { display: flex; align-items: center; gap: 8px; font-size: 12px; color: rgba(255, 255, 255, 0.55); font-weight: 500; }
+      .conn-dot .dot { width: 7px; height: 7px; border-radius: 50%; background: #4b4d66; flex: 0 0 auto; }
+      .conn-dot.on .dot { background: #2fd575; box-shadow: 0 0 0 3px rgba(47, 213, 117, 0.18); }
+      .side .ver { font-size: 11px; color: rgba(255, 255, 255, 0.3); }
+
+      /* ================= Main / topbar ================= */
+      main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+      .topbar {
+        display: flex; align-items: center; gap: 12px; padding: 16px 28px;
+        background: rgba(247, 247, 251, 0.85); backdrop-filter: blur(8px);
+        position: sticky; top: 0; z-index: 20; border-bottom: 1px solid var(--line);
+      }
+      .topbar h1 {
+        font-family: "Space Grotesk", Inter, sans-serif; font-size: 19px; font-weight: 700;
+        letter-spacing: -0.01em; margin: 0;
+      }
+      .topbar .crumb { color: var(--muted); font-size: 12.5px; font-weight: 500; margin-top: 1px; }
+      .spacer { flex: 1; }
+      .content { padding: 24px 28px 60px; max-width: 1060px; width: 100%; margin: 0 auto; }
+
+      /* ================= Botões ================= */
+      .btn {
+        border: none; border-radius: 10px; font-weight: 600; font-size: 13.5px;
+        padding: 10px 16px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+        transition: transform 0.12s, box-shadow 0.15s, background 0.15s;
+      }
+      .btn:active { transform: scale(0.98); }
+      .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 4px 14px rgba(91, 91, 214, 0.35); }
+      .btn-primary:hover { background: var(--primary-dark); }
+      .btn-ghost { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+      .btn-ghost:hover { border-color: #cdd0e0; }
+      .btn-danger-soft { background: var(--danger-soft); color: var(--danger); }
+      .icon-btn {
+        width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface);
+        cursor: pointer; display: grid; place-items: center; color: var(--muted); transition: color 0.15s, border-color 0.15s;
+      }
+      .icon-btn:hover { color: var(--ink); border-color: #cdd0e0; }
+      .icon-btn svg { width: 15px; height: 15px; }
+
+      /* ================= KPIs ================= */
+      .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+      .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 17px; box-shadow: var(--shadow); }
+      .kpi .k { font-size: 11.5px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; text-transform: uppercase; }
+      .kpi .v {
+        font-family: "Space Grotesk", Inter, sans-serif; font-size: 30px; font-weight: 700;
+        letter-spacing: -0.02em; margin-top: 6px; font-variant-numeric: tabular-nums;
+      }
+      .kpi .d { font-size: 12px; color: var(--muted); margin-top: 3px; font-weight: 500; }
+      .kpi.hero { background: linear-gradient(135deg, #5b5bd6, #4747c2 60%, #3a3aa8); border-color: transparent; color: #fff; }
+      .kpi.hero .k, .kpi.hero .d { color: rgba(255, 255, 255, 0.75); }
+
+      /* ================= Cartões / listas ================= */
+      .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+      .card-head { display: flex; align-items: center; gap: 10px; padding: 15px 18px; border-bottom: 1px solid var(--line); }
+      .card-head h2 { font-family: "Space Grotesk", Inter, sans-serif; font-size: 15px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+      .card-head .sub { color: var(--muted); font-size: 12.5px; font-weight: 500; }
+      .section-gap { margin-bottom: 20px; }
+
+      /* Regras */
+      .rule-row {
+        display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--line);
+        transition: background 0.12s;
+      }
+      .rule-row:last-child { border-bottom: none; }
+      .rule-row:hover { background: #fafafd; }
+      .rule-row.off .rule-mid, .rule-row.off .pbadge { opacity: 0.45; }
+      .pbadge {
+        width: 38px; height: 38px; border-radius: 11px; flex: 0 0 auto; display: grid; place-items: center; color: #fff;
+      }
+      .pbadge svg { width: 19px; height: 19px; }
+      .pbadge.ig { background: var(--ig); }
+      .pbadge.fb { background: var(--fb); }
+      .rule-mid { flex: 1; min-width: 0; }
+      .rule-kw {
+        font-family: "Space Grotesk", Inter, sans-serif; font-weight: 700; font-size: 15px; letter-spacing: -0.01em;
+        display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      }
+      .kw-chip {
+        background: var(--primary-soft); color: var(--primary-dark); border-radius: 8px; padding: 2px 9px;
+        font-size: 13.5px;
+      }
+      .rule-meta { color: var(--muted); font-size: 12.5px; margin-top: 3px; font-weight: 500; }
+      .rule-acts { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+
+      /* Switch */
+      .switch { position: relative; width: 40px; height: 23px; flex: 0 0 auto; cursor: pointer; }
+      .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+      .switch .track {
+        position: absolute; inset: 0; background: #d5d7e4; border-radius: 20px; transition: background 0.18s; pointer-events: none;
+      }
+      .switch .track::after {
+        content: ""; position: absolute; top: 2.5px; left: 3px; width: 18px; height: 18px; border-radius: 50%;
+        background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.18s;
+      }
+      .switch input:checked + .track { background: var(--ok); }
+      .switch input:checked + .track::after { transform: translateX(16px); }
+      .switch input:focus-visible + .track { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+      /* Atividade */
+      .act-row { display: flex; align-items: center; gap: 13px; padding: 13px 18px; border-bottom: 1px solid var(--line); }
+      .act-row:last-child { border-bottom: none; }
+      .act-ico { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto; font-size: 13px; }
+      .act-ico.ok { background: var(--ok-soft); color: var(--ok); }
+      .act-ico.err { background: var(--danger-soft); color: var(--danger); }
+      .act-mid { flex: 1; min-width: 0; }
+      .act-title { font-weight: 600; font-size: 13.5px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+      .act-sub { color: var(--muted); font-size: 12.5px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .act-time { color: var(--muted); font-size: 12px; font-weight: 500; flex: 0 0 auto; }
+      .mini-pill { font-size: 11px; font-weight: 700; border-radius: 20px; padding: 2px 8px; }
+      .mini-pill.dm { background: var(--primary-soft); color: var(--primary-dark); }
+      .mini-pill.reply { background: var(--ok-soft); color: var(--ok); }
+      .mini-pill.err { background: var(--danger-soft); color: var(--danger); }
+
+      /* Ligações */
+      .conn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      .conn-card { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+      .conn-top { display: flex; align-items: center; gap: 12px; }
+      .conn-name { font-family: "Space Grotesk", Inter, sans-serif; font-weight: 700; font-size: 16px; }
+      .conn-state { font-size: 12.5px; font-weight: 600; margin-top: 2px; }
+      .conn-state.on { color: var(--ok); }
+      .conn-state.off { color: var(--warn); }
+      .conn-help { color: var(--muted); font-size: 13px; line-height: 1.55; }
+      .conn-help code {
+        background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px;
+        font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      /* Empty states */
+      .empty {
+        text-align: center; padding: 44px 20px; color: var(--muted);
+      }
+      .empty .big { font-size: 30px; margin-bottom: 10px; }
+      .empty h3 { font-family: "Space Grotesk", Inter, sans-serif; color: var(--ink); font-size: 16px; margin: 0 0 6px; }
+      .empty p { font-size: 13.5px; margin: 0 auto 16px; max-width: 380px; line-height: 1.55; }
+
+      /* ================= Modal (editor) ================= */
+      .overlay {
+        position: fixed; inset: 0; background: rgba(19, 20, 38, 0.55); z-index: 60;
+        display: grid; place-items: center; padding: 18px; animation: fade 0.16s ease;
+      }
+      @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+      .modal {
+        background: var(--surface); border-radius: 18px; width: 100%; max-width: 860px;
+        max-height: 92vh; overflow: auto; box-shadow: 0 30px 80px rgba(19, 20, 38, 0.35);
+        animation: pop 0.18s ease;
+      }
+      @keyframes pop { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+      .modal-head { display: flex; align-items: center; padding: 18px 22px 0; }
+      .modal-head h2 { font-family: "Space Grotesk", Inter, sans-serif; font-size: 18px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+      .modal-body { display: grid; grid-template-columns: 1fr 320px; gap: 26px; padding: 18px 22px 22px; }
+
+      .field { margin-bottom: 14px; }
+      .field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+      .field input[type="text"], .field select, .field textarea {
+        width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+        font-size: 14px; font-family: inherit; background: var(--surface); color: var(--ink);
+        transition: border-color 0.15s, box-shadow 0.15s;
+      }
+      .field textarea { resize: vertical; min-height: 66px; line-height: 1.5; }
+      .field input:focus, .field select:focus, .field textarea:focus {
+        outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(91, 91, 214, 0.15);
+      }
+      .field .hint { font-size: 11.5px; color: var(--muted); margin-top: 5px; }
+
+      .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .seg input { position: absolute; opacity: 0; pointer-events: none; }
+      .seg label {
+        display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--line); border-radius: 12px;
+        padding: 10px 12px; cursor: pointer; margin: 0; transition: border-color 0.15s, background 0.15s;
+      }
+      .seg label .pbadge { width: 30px; height: 30px; border-radius: 9px; }
+      .seg label .pbadge svg { width: 15px; height: 15px; }
+      .seg label b { display: block; font-size: 13px; color: var(--ink); }
+      .seg label small { display: block; color: var(--muted); font-size: 11px; font-weight: 500; margin-top: 1px; }
+      .seg input:checked + label { border-color: var(--primary); background: var(--primary-soft); }
+      .seg input:focus-visible + label { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .modal-foot { display: flex; align-items: center; gap: 10px; padding: 0 22px 22px; }
+      .modal-foot .msg { color: var(--danger); font-size: 12.5px; font-weight: 600; }
+
+      /* Pré-visualização em bolhas de chat (assinatura) */
+      .preview {
+        background: var(--bg); border: 1px solid var(--line); border-radius: 16px; padding: 16px 14px;
+        align-self: start; position: sticky; top: 0;
+      }
+      .preview .plabel {
+        font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+        color: var(--muted); margin: 4px 2px 8px;
+      }
+      .bubble {
+        border-radius: 16px; padding: 9px 13px; font-size: 13px; line-height: 1.45; max-width: 92%;
+        width: fit-content; word-break: break-word;
+      }
+      .bubble .who { display: block; font-size: 10.5px; font-weight: 700; opacity: 0.65; margin-bottom: 2px; }
+      .bubble.them { background: #e9eaf2; color: var(--ink); border-bottom-left-radius: 5px; }
+      .bubble.us { background: var(--primary); color: #fff; border-bottom-left-radius: 5px; margin: 8px 0 0 22px; }
+      .bubble.dm { background: linear-gradient(45deg, #dd2a7b, #8134af); color: #fff; border-bottom-left-radius: 5px; }
+      .bubble .ph { opacity: 0.55; font-style: italic; }
+      .preview .dm-block { margin-top: 14px; }
+      .preview hr { border: none; border-top: 1px dashed #d5d7e4; margin: 14px 0 2px; }
+
+      /* ================= Gate ================= */
+      .gate {
+        position: fixed; inset: 0; background: radial-gradient(1000px 600px at 70% -10%, #2a2c53, var(--sidebar) 60%);
+        display: grid; place-items: center; z-index: 90; padding: 20px;
+      }
+      .gate .box {
+        background: var(--surface); border-radius: 20px; padding: 30px 28px; width: 100%; max-width: 370px;
+        text-align: center; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.45);
+      }
+      .gate .logo { color: var(--ink); justify-content: center; padding: 0 0 4px; font-size: 20px; }
+      .gate p { color: var(--muted); font-size: 13.5px; margin: 4px 0 18px; }
+      .gate input {
+        width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 11px;
+        font-size: 15px; font-family: inherit; margin-bottom: 10px; text-align: center;
+      }
+      .gate input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(91, 91, 214, 0.15); }
+      .gate .btn { width: 100%; justify-content: center; padding: 12px; font-size: 14.5px; }
+      .gate .err { color: var(--danger); font-size: 12.5px; font-weight: 600; margin: 2px 0 10px; min-height: 16px; }
+
+      /* ================= Responsivo ================= */
+      @media (max-width: 920px) {
+        .shell { flex-direction: column; }
+        .side { width: 100%; height: auto; position: static; flex-direction: row; align-items: center; padding-right: 10px; }
+        .logo { padding: 12px 14px; }
+        .side nav { flex-direction: row; padding: 0; gap: 2px; overflow-x: auto; flex: 1; }
+        .side nav button { padding: 9px 11px; white-space: nowrap; }
+        .side nav button span { display: none; }
+        .side nav button svg { width: 19px; height: 19px; }
+        .side .foot { display: none; }
+        .topbar { padding: 13px 16px; }
+        .content { padding: 18px 16px 50px; }
+        .kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
+        .modal-body { grid-template-columns: 1fr; }
+        .preview { position: static; }
+        .conn-grid { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 560px) {
+        .kpi .v { font-size: 24px; }
+        .grid2 { grid-template-columns: 1fr; }
+        .topbar h1 { font-size: 16px; }
+        .btn-primary .btn-label-sm { display: none; }
+        .rule-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Porta de entrada por senha -->
+    <div id="gate" class="gate" hidden>
+      <form class="box" id="gate-form">
+        <div class="logo"><span class="mark">⚡</span> Replyzo</div>
+        <p>Introduz a senha para gerir as automações.</p>
+        <div class="err" id="gate-err"></div>
+        <input type="password" id="gate-pass" placeholder="Senha" autocomplete="current-password" />
+        <button type="submit" class="btn btn-primary">Entrar</button>
+      </form>
+    </div>
+
+    <div class="shell" id="app" hidden>
+      <aside class="side">
+        <div class="logo"><span class="mark">⚡</span> Replyzo</div>
+        <nav id="nav">
+          <button data-view="overview" class="active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+            <span>Visão geral</span>
+          </button>
+          <button data-view="automations">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>Automações</span>
+          </button>
+          <button data-view="activity">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+            <span>Atividade</span>
+          </button>
+          <button data-view="connections">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7a5 5 0 0 1 0-10h2"/><path d="M15 7h2a5 5 0 0 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            <span>Ligações</span>
+          </button>
+        </nav>
+        <div class="foot">
+          <div class="conn-dot" id="dot-ig"><span class="dot"></span> Instagram</div>
+          <div class="conn-dot" id="dot-fb"><span class="dot"></span> Facebook</div>
+          <div class="ver">self-hosted · v1.0</div>
+        </div>
+      </aside>
+
+      <main>
+        <div class="topbar">
+          <div>
+            <h1 id="page-title">Visão geral</h1>
+            <div class="crumb" id="page-crumb">Comentários → resposta + DM, em piloto automático</div>
+          </div>
+          <div class="spacer"></div>
+          <button class="icon-btn" id="refresh" title="Atualizar" aria-label="Atualizar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+          </button>
+          <button class="btn btn-primary" id="new-rule">＋ <span class="btn-label-sm">Nova automação</span></button>
+        </div>
+        <div class="content" id="main-view"><!-- render via JS --></div>
+      </main>
+    </div>
+
+    <!-- Editor de automação -->
+    <div class="overlay" id="editor" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+        <div class="modal-head">
+          <h2 id="editor-title">Nova automação</h2>
+          <div class="spacer"></div>
+          <button class="icon-btn" id="editor-close" aria-label="Fechar">✕</button>
+        </div>
+        <form id="editor-form">
+          <div class="modal-body">
+            <div>
+              <div class="field">
+                <label>Onde</label>
+                <div class="seg" id="seg-platform">
+                  <span>
+                    <input type="radio" name="platform" value="ig" id="plat-ig" checked />
+                    <label for="plat-ig">
+                      <span class="pbadge ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="17.6" cy="6.4" r="1.3" fill="currentColor" stroke="none"/></svg></span>
+                      <span><b>Instagram</b><small>responde + envia DM</small></span>
+                    </label>
+                  </span>
+                  <span>
+                    <input type="radio" name="platform" value="fb" id="plat-fb" />
+                    <label for="plat-fb">
+                      <span class="pbadge fb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 8.5V6.8c0-.8.5-1 1.2-1H17V2.5h-2.6C11.7 2.5 10.5 4 10.5 6.4v2.1H8v3.4h2.5v9.6H14v-9.6h2.6l.4-3.4H14z"/></svg></span>
+                      <span><b>Facebook</b><small>só responde ao comentário</small></span>
+                    </label>
+                  </span>
+                </div>
+              </div>
+              <div class="grid2">
+                <div class="field">
+                  <label for="f-keyword">Palavra que dispara</label>
+                  <input type="text" id="f-keyword" name="keyword" placeholder="QUERO" autocomplete="off" />
+                </div>
+                <div class="field">
+                  <label for="f-match">Como detetar</label>
+                  <select id="f-match" name="match_type">
+                    <option value="contains">Contém a palavra</option>
+                    <option value="exact">Comentário exato</option>
+                    <option value="starts">Começa pela palavra</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label for="f-reply">Resposta no comentário</label>
+                <textarea id="f-reply" name="reply_public" placeholder="Enviei-te DM! 💌 Vê a tua caixa de mensagens."></textarea>
+                <div class="hint">Deixa vazio para não responder publicamente.</div>
+              </div>
+              <div class="field" id="f-dm-field">
+                <label for="f-dm">Mensagem privada (DM)</label>
+                <textarea id="f-dm" name="dm_text" placeholder="Olá! 👋 Aqui está o link que pediste: https://…"></textarea>
+                <div class="hint">Enviada uma única vez por comentário (regra do Instagram).</div>
+              </div>
+            </div>
+
+            <aside class="preview" id="preview">
+              <div class="plabel">Pré-visualização</div>
+              <div class="bubble them"><span class="who">@cliente</span><span id="pv-comment">QUERO</span></div>
+              <div class="bubble us" id="pv-reply-wrap"><span class="who">a tua página</span><span id="pv-reply" class="ph">sem resposta pública</span></div>
+              <div class="dm-block" id="pv-dm-block">
+                <hr />
+                <div class="plabel">Na caixa de mensagens</div>
+                <div class="bubble dm"><span class="who">a tua página</span><span id="pv-dm" class="ph">sem mensagem privada</span></div>
+              </div>
+            </aside>
+          </div>
+          <div class="modal-foot">
+            <button type="submit" class="btn btn-primary" id="editor-save">Guardar automação</button>
+            <button type="button" class="btn btn-ghost" id="editor-cancel">Cancelar</button>
+            <span class="msg" id="editor-msg"></span>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="/dashboard.js"></script>
+  </body>
+</html>

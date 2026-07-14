@@ -1,0 +1,17 @@
+{
+  "name": "manychat-proprio",
+  "version": "1.0.0",
+  "description": "Respostas automaticas a comentarios: Facebook (responde) e Instagram (responde + DM)",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}

@@ -1,0 +1,45 @@
+# =============================================================================
+#  Render Blueprint — deploy do "ManyChat" caseiro.
+# -----------------------------------------------------------------------------
+#  Como usar:
+#   1) Sobe este projeto para um repositório GitHub.
+#   2) No Render: New > Blueprint > escolhe o repositório.
+#   3) Preenche as variáveis marcadas (Meta + senha do dashboard).
+#  O disco persistente guarda as regras e o histórico (montado em /var/data).
+#  NOTA: o plano "free" não tem disco (perdes as regras a cada deploy) e o
+#  serviço adormece (webhooks chegam com atraso). Para produção usa "starter".
+# =============================================================================
+services:
+  - type: web
+    name: manychat-proprio
+    runtime: node
+    plan: starter            # necessário para ter disco persistente (~7 USD/mês)
+    region: frankfurt        # UE (perto de Portugal)
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: DATA_DIR
+        value: /var/data
+      # Preenche estas no painel do Render (Environment) — NÃO ficam no código.
+      - key: DASHBOARD_PASS
+        sync: false
+      - key: META_VERIFY_TOKEN
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: IG_USER_ID
+        sync: false
+      - key: IG_ACCESS_TOKEN
+        sync: false
+      - key: PAGE_ID
+        sync: false
+      - key: PAGE_ACCESS_TOKEN
+        sync: false
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
