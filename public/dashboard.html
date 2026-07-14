@@ -244,6 +244,13 @@
         outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(91, 91, 214, 0.15);
       }
       .field .hint { font-size: 11.5px; color: var(--muted); margin-top: 5px; }
+      .var-chip {
+        border: 1px solid var(--line); background: var(--primary-soft); color: var(--primary-dark);
+        border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 700; cursor: pointer;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .var-chip:hover { border-color: var(--primary); }
+      .var-chip:active { transform: scale(0.96); }
 
       .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
       .seg input { position: absolute; opacity: 0; pointer-events: none; }
@@ -430,13 +437,13 @@
               </div>
               <div class="field">
                 <label for="f-reply">Resposta no comentário</label>
-                <textarea id="f-reply" name="reply_public" placeholder="Enviei-te DM! 💌 Vê a tua caixa de mensagens."></textarea>
-                <div class="hint">Deixa vazio para não responder publicamente.</div>
+                <textarea id="f-reply" name="reply_public" placeholder="Olá {nome}! Enviei-te DM 💌 Vê a tua caixa de mensagens."></textarea>
+                <div class="hint">Deixa vazio para não responder publicamente. <button type="button" class="var-chip" data-insert="f-reply">＋ {nome}</button> insere o nome de quem comentou.</div>
               </div>
               <div class="field" id="f-dm-field">
                 <label for="f-dm">Mensagem privada (DM)</label>
-                <textarea id="f-dm" name="dm_text" placeholder="Olá! 👋 Aqui está o link que pediste: https://…"></textarea>
-                <div class="hint">Enviada uma única vez por comentário (regra do Instagram).</div>
+                <textarea id="f-dm" name="dm_text" placeholder="Olá {nome}! 👋 Aqui está o link que pediste: https://…"></textarea>
+                <div class="hint">Enviada uma única vez por comentário (regra do Instagram). <button type="button" class="var-chip" data-insert="f-dm">＋ {nome}</button></div>
               </div>
             </div>
 

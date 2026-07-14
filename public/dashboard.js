@@ -302,6 +302,18 @@ function bindEditor() {
   editorForm.addEventListener("input", syncPreview);
   editorForm.addEventListener("change", syncPreview);
 
+  // Chips "＋ {nome}": inserem a variável na posição do cursor.
+  editorForm.querySelectorAll(".var-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const ta = document.getElementById(chip.dataset.insert);
+      const pos = ta.selectionStart ?? ta.value.length;
+      ta.value = ta.value.slice(0, pos) + "{nome}" + ta.value.slice(ta.selectionEnd ?? pos);
+      ta.focus();
+      ta.selectionStart = ta.selectionEnd = pos + 6;
+      syncPreview();
+    });
+  });
+
   editorForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const msg = document.getElementById("editor-msg");
@@ -343,6 +355,11 @@ function closeEditor() {
   editingId = null;
 }
 
+// Substitui {nome}/{name} — igual ao servidor, para a pré-visualização bater certo.
+function applyTemplate(text, name) {
+  return (text || "").replace(/\{\s*(?:nome|name)\s*\}/gi, name);
+}
+
 // Pré-visualização ao vivo: comentário → resposta → DM, como no Instagram.
 function syncPreview() {
   const isFb = editorForm.platform.value === "fb";
@@ -350,8 +367,9 @@ function syncPreview() {
   document.getElementById("pv-dm-block").hidden = isFb;
 
   const kw = editorForm.keyword.value.trim();
-  const reply = editorForm.reply_public.value.trim();
-  const dm = editorForm.dm_text.value.trim();
+  // O comentador de exemplo chama-se "cliente" — é isso que o {nome} vira aqui.
+  const reply = applyTemplate(editorForm.reply_public.value.trim(), "cliente");
+  const dm = applyTemplate(editorForm.dm_text.value.trim(), "cliente");
 
   document.getElementById("pv-comment").textContent = kw || "palavra-chave";
   setBubble("pv-reply", reply, "sem resposta pública");
