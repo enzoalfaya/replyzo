@@ -202,12 +202,18 @@ function renderAutomations() {
     </div>`;
 }
 
+// Variações da palavra-chave ("QUERO, KERO" -> ["QUERO","KERO"]).
+function kwVariants(keyword) {
+  return String(keyword || "").split(",").map((s) => s.trim()).filter(Boolean);
+}
+
 function ruleRowHtml(r) {
   const does = [r.reply_public ? "responde no comentário" : "", r.dm_text ? "envia DM" : ""].filter(Boolean).join(" + ") || "sem ação";
+  const chips = kwVariants(r.keyword).map((k) => `<span class="kw-chip">${escapeHtml(k)}</span>`).join(" ");
   return `<div class="rule-row ${r.active ? "" : "off"}">
     ${pbadge(r.platform)}
     <div class="rule-mid">
-      <div class="rule-kw"><span class="kw-chip">${escapeHtml(r.keyword)}</span></div>
+      <div class="rule-kw">${chips}</div>
       <div class="rule-meta">${MATCH_NAMES[r.match_type] || r.match_type} · ${does}</div>
     </div>
     <div class="rule-acts">
@@ -244,7 +250,7 @@ function emptyActivityHtml() {
 
 function actRowHtml(ev) {
   const rule = (data.rules || []).find((r) => r.id === ev.rule_id);
-  const kw = rule ? rule.keyword : "regra apagada";
+  const kw = rule ? kwVariants(rule.keyword)[0] || rule.keyword : "regra apagada";
   const plat = ev.platform === "ig" ? "Instagram" : "Facebook";
   const pills = ev.ok
     ? [ev.did_public ? `<span class="mini-pill reply">respondeu</span>` : "", ev.did_dm ? `<span class="mini-pill dm">DM enviada</span>` : ""].filter(Boolean).join("")
@@ -366,7 +372,8 @@ function syncPreview() {
   document.getElementById("f-dm-field").hidden = isFb;
   document.getElementById("pv-dm-block").hidden = isFb;
 
-  const kw = editorForm.keyword.value.trim();
+  // Com variações ("QUERO, KERO"), o comentário de exemplo usa a primeira.
+  const kw = kwVariants(editorForm.keyword.value)[0] || "";
   // O comentador de exemplo chama-se "cliente" — é isso que o {nome} vira aqui.
   const reply = applyTemplate(editorForm.reply_public.value.trim(), "cliente");
   const dm = applyTemplate(editorForm.dm_text.value.trim(), "cliente");
