@@ -39,6 +39,9 @@ services:
         sync: false
       - key: PAGE_ACCESS_TOKEN
         sync: false
+      # Segredo partilhado com o checkout para o ping de conversão (vendas).
+      - key: CONVERSION_SECRET
+        sync: false
     disk:
       name: data
       mountPath: /var/data

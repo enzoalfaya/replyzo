@@ -22,6 +22,7 @@ import {
   listAutomationEvents,
   automationStats,
   recordLinkClick,
+  markConversion,
 } from "./lib/db.js";
 import {
   metaVerifyChallenge,
@@ -161,6 +162,28 @@ app.delete("/api/automation/rules/:id", requireDash, (req, res) => {
 app.post("/api/ig/subscribe", requireDash, async (_req, res) => {
   const r = await igSubscribeApp();
   res.status(r.ok ? 200 : 400).json(r);
+});
+
+// -----------------------------------------------------------------------------
+//  Ping de conversao vindo do checkout: "o clique rzo_{token} comprou".
+//  Autenticado com o segredo partilhado CONVERSION_SECRET (cabecalho
+//  x-conversion-key). Idempotente — repeticoes nao duplicam a venda.
+// -----------------------------------------------------------------------------
+const CONVERSION_SECRET = process.env.CONVERSION_SECRET || "";
+
+app.post("/api/conversion", (req, res) => {
+  if (!CONVERSION_SECRET) return res.status(503).json({ ok: false, error: "CONVERSION_SECRET não definido." });
+  const provided = Buffer.from(String(req.get("x-conversion-key") || ""));
+  const expected = Buffer.from(CONVERSION_SECRET);
+  const authOk = provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
+  if (!authOk) return res.status(401).json({ ok: false, error: "Não autorizado." });
+
+  const token = String(req.body?.token || "").replace(/^rzo_/, "").trim();
+  if (!token) return res.status(400).json({ ok: false, error: "Falta o token." });
+  const ev = markConversion(token, req.body?.amount);
+  if (!ev) return res.status(404).json({ ok: false, error: "Token desconhecido." });
+  console.log(`[conversion] 💰 venda atribuída a @${ev.username || "?"} (${ev.platform}, ${ev.comment_id})`);
+  res.json({ ok: true });
 });
 
 // -----------------------------------------------------------------------------

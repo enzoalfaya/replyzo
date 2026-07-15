@@ -151,14 +151,17 @@ function disarmDelete() {
 // ---- Vistas -------------------------------------------------------------------
 const fmtInt = new Intl.NumberFormat("pt-PT");
 
+const fmtEur = new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" });
+
 function kpisHtml() {
   const s = data.stats || {};
   const active = (data.rules || []).filter((r) => r.active).length;
+  const errNote = s.errors ? ` · <span style="color:var(--danger)">${fmtInt.format(s.errors)} erros</span>` : "";
   return `<div class="kpis">
     <div class="kpi hero"><div class="k">Automações ativas</div><div class="v">${fmtInt.format(active)}</div><div class="d">de ${fmtInt.format((data.rules || []).length)} criadas</div></div>
-    <div class="kpi"><div class="k">Comentários tratados</div><div class="v">${fmtInt.format(s.total || 0)}</div><div class="d">${fmtInt.format(s.today || 0)} hoje</div></div>
+    <div class="kpi"><div class="k">Comentários tratados</div><div class="v">${fmtInt.format(s.total || 0)}</div><div class="d">${fmtInt.format(s.today || 0)} hoje${errNote}</div></div>
     <div class="kpi"><div class="k">DMs enviadas</div><div class="v">${fmtInt.format(s.dms || 0)}</div><div class="d">${fmtInt.format(s.clicked || 0)} abriram o link</div></div>
-    <div class="kpi"><div class="k">Erros</div><div class="v">${fmtInt.format(s.errors || 0)}</div><div class="d">${s.errors ? "vê a Atividade" : "tudo em ordem"}</div></div>
+    <div class="kpi"><div class="k">💰 Vendas</div><div class="v">${fmtInt.format(s.purchases || 0)}</div><div class="d">${s.purchases ? fmtEur.format((s.revenue || 0) / 100) + " atribuídos" : "dos comentários"}</div></div>
   </div>`;
 }
 
@@ -252,13 +255,17 @@ function actRowHtml(ev) {
   const rule = (data.rules || []).find((r) => r.id === ev.rule_id);
   const kw = rule ? kwVariants(rule.keyword)[0] || rule.keyword : "regra apagada";
   const plat = ev.platform === "ig" ? "Instagram" : "Facebook";
+  const bought = ev.purchased_at
+    ? `<span class="mini-pill reply" style="background:#14311f;color:#3ecf7a">💰 comprou${ev.purchase_amount ? " · " + fmtEur.format(ev.purchase_amount / 100) : ""}</span>`
+    : "";
   const pills = ev.ok
     ? [
         ev.did_public ? `<span class="mini-pill reply">respondeu</span>` : "",
         ev.did_dm ? `<span class="mini-pill dm">DM enviada</span>` : "",
         ev.clicks > 0 ? `<span class="mini-pill dm" title="${ev.clicks} abertura(s)">🔗 abriu o link</span>` : "",
+        bought,
       ].filter(Boolean).join("")
-    : `<span class="mini-pill err">falhou</span>`;
+    : `<span class="mini-pill err">falhou</span>` + bought;
   const who = ev.username ? "@" + ev.username : "comentário " + (ev.comment_id || "");
   const sub = ev.ok
     ? `${plat} · ${escapeHtml(who)}`
