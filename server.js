@@ -21,6 +21,7 @@ import {
   deleteRule,
   listAutomationEvents,
   automationStats,
+  recordLinkClick,
 } from "./lib/db.js";
 import {
   metaVerifyChallenge,
@@ -79,6 +80,14 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // Health check (usado pelo Render).
 app.get("/health", (_req, res) => res.json({ ok: true }));
+
+// Link rastreado enviado nas respostas/DMs: regista a abertura e redireciona
+// para o destino (que ja leva o utm_source para a atribuicao no checkout).
+app.get("/r/:token", (req, res) => {
+  const ev = recordLinkClick(req.params.token);
+  if (!ev || !ev.link_url) return res.status(404).send("Este link já não está disponível.");
+  res.redirect(302, ev.link_url);
+});
 
 // -----------------------------------------------------------------------------
 //  Autenticacao do dashboard (cabecalho x-dash-key, comparacao em tempo

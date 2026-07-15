@@ -157,7 +157,7 @@ function kpisHtml() {
   return `<div class="kpis">
     <div class="kpi hero"><div class="k">Automações ativas</div><div class="v">${fmtInt.format(active)}</div><div class="d">de ${fmtInt.format((data.rules || []).length)} criadas</div></div>
     <div class="kpi"><div class="k">Comentários tratados</div><div class="v">${fmtInt.format(s.total || 0)}</div><div class="d">${fmtInt.format(s.today || 0)} hoje</div></div>
-    <div class="kpi"><div class="k">DMs enviadas</div><div class="v">${fmtInt.format(s.dms || 0)}</div><div class="d">respostas públicas: ${fmtInt.format(s.publics || 0)}</div></div>
+    <div class="kpi"><div class="k">DMs enviadas</div><div class="v">${fmtInt.format(s.dms || 0)}</div><div class="d">${fmtInt.format(s.clicked || 0)} abriram o link</div></div>
     <div class="kpi"><div class="k">Erros</div><div class="v">${fmtInt.format(s.errors || 0)}</div><div class="d">${s.errors ? "vê a Atividade" : "tudo em ordem"}</div></div>
   </div>`;
 }
@@ -253,9 +253,16 @@ function actRowHtml(ev) {
   const kw = rule ? kwVariants(rule.keyword)[0] || rule.keyword : "regra apagada";
   const plat = ev.platform === "ig" ? "Instagram" : "Facebook";
   const pills = ev.ok
-    ? [ev.did_public ? `<span class="mini-pill reply">respondeu</span>` : "", ev.did_dm ? `<span class="mini-pill dm">DM enviada</span>` : ""].filter(Boolean).join("")
+    ? [
+        ev.did_public ? `<span class="mini-pill reply">respondeu</span>` : "",
+        ev.did_dm ? `<span class="mini-pill dm">DM enviada</span>` : "",
+        ev.clicks > 0 ? `<span class="mini-pill dm" title="${ev.clicks} abertura(s)">🔗 abriu o link</span>` : "",
+      ].filter(Boolean).join("")
     : `<span class="mini-pill err">falhou</span>`;
-  const sub = ev.ok ? `${plat} · comentário ${escapeHtml(ev.comment_id || "")}` : escapeHtml(ev.error || "erro desconhecido");
+  const who = ev.username ? "@" + ev.username : "comentário " + (ev.comment_id || "");
+  const sub = ev.ok
+    ? `${plat} · ${escapeHtml(who)}`
+    : `${escapeHtml(who)} · ${escapeHtml(ev.error || "erro desconhecido")}`;
   return `<div class="act-row">
     <div class="act-ico ${ev.ok ? "ok" : "err"}">${ev.ok ? "✓" : "✕"}</div>
     <div class="act-mid">
