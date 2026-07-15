@@ -22,6 +22,8 @@ import {
   listAutomationEvents,
   automationStats,
   recordLinkClick,
+  getEventByToken,
+  resetClicks,
   markConversion,
 } from "./lib/db.js";
 import {
@@ -84,10 +86,23 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 
 // Link rastreado enviado nas respostas/DMs: regista a abertura e redireciona
 // para o destino (que ja leva o utm_source para a atribuicao no checkout).
+// BOTS (a Meta abre todos os links para gerar a pre-visualizacao!) recebem o
+// redirect na mesma, mas NAO contam como clique — senao todo o link aparecia
+// "aberto" segundos depois de enviado.
+const BOT_UA_RE =
+  /bot|crawl|spider|preview|scan|fetch|facebookexternalhit|facebot|meta-externalagent|whatsapp|telegram|skype|slack|discord|curl|wget|python|axios|headless/i;
+
 app.get("/r/:token", (req, res) => {
-  const ev = recordLinkClick(req.params.token);
+  const ua = String(req.get("user-agent") || "");
+  const isBot = !ua || BOT_UA_RE.test(ua);
+  const ev = isBot ? getEventByToken(req.params.token) : recordLinkClick(req.params.token);
   if (!ev || !ev.link_url) return res.status(404).send("Este link já não está disponível.");
   res.redirect(302, ev.link_url);
+});
+
+// Limpa TODAS as contagens de cliques (para zerar falsos positivos antigos).
+app.post("/api/clicks/reset", requireDash, (_req, res) => {
+  res.json({ ok: resetClicks() });
 });
 
 // -----------------------------------------------------------------------------
