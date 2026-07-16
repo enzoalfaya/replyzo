@@ -106,7 +106,8 @@ app.get("/r/:token", (req, res) => {
 // Responde sempre com um GIF 1x1 transparente. Ignora bots (não executam JS,
 // mas filtramos na mesma por segurança).
 const PIXEL_GIF = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
-app.get("/t", (req, res) => {
+// GET (Image) e POST (navigator.sendBeacon) — os dados vão nos query params.
+app.all("/t", (req, res) => {
   if (!isBot(String(req.get("user-agent") || ""))) {
     const token = String(req.query.token || "").replace(/^rzo_/, "").trim();
     const step = String(req.query.step || "");

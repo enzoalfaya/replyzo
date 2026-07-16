@@ -50,11 +50,14 @@
   if (!token) return; // nao veio dos comentarios: nada a medir
 
   function beacon(step) {
+    var url = ORIGIN + "/t?token=" + encodeURIComponent(token) +
+      "&step=" + encodeURIComponent(step) + "&_=" + Date.now();
+    // sendBeacon sobrevive à navegação (o clique no CTA leva logo a pessoa
+    // embora); Image fica como alternativa para browsers antigos.
     try {
-      var img = new Image(1, 1);
-      img.src = ORIGIN + "/t?token=" + encodeURIComponent(token) +
-        "&step=" + encodeURIComponent(step) + "&_=" + Date.now();
+      if (navigator.sendBeacon && navigator.sendBeacon(url)) return;
     } catch (e) {}
+    try { new Image(1, 1).src = url; } catch (e) {}
   }
 
   // ---- Pagina de vendas: conta a chegada logo no carregamento ---------------
