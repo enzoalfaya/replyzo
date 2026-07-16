@@ -165,6 +165,51 @@ function kpisHtml() {
   </div>`;
 }
 
+// Funil: do comentário à compra. Base = respostas com link enviado.
+function funnelHtml() {
+  const s = data.stats || {};
+  const base = s.withLink || 0;
+  const steps = [
+    { label: "Responderam com link", n: base, hint: "comentários que receberam o link" },
+    { label: "Abriram o link", n: s.clicked || 0, hint: "clicaram no link da resposta/DM" },
+    { label: 'Clicaram "ver as 500 receitas"', n: s.cta || 0, hint: "na página da receita" },
+    { label: "Foram à página de vendas", n: s.sales || 0, hint: "chegaram à página de vendas" },
+    { label: "Compraram", n: s.purchases || 0, hint: "concluíram a compra", money: true },
+  ];
+  if (!base) {
+    return `<div class="card section-gap">
+      <div class="card-head"><h2>Funil de conversão</h2></div>
+      <div class="empty" style="padding:30px 20px">
+        <div class="big">🫗</div>
+        <h3>Ainda sem dados no funil</h3>
+        <p>Quando as tuas respostas levarem um link e alguém o abrir, o percurso até à compra aparece aqui.</p>
+      </div>
+    </div>`;
+  }
+  const pct = (n) => (base ? Math.round((n / base) * 100) : 0);
+  const rows = steps.map((st, i) => {
+    const p = pct(st.n);
+    // conversão relativa ao passo anterior (só a partir do 2º)
+    const prev = i > 0 ? steps[i - 1].n : st.n;
+    const stepConv = i > 0 && prev > 0 ? Math.round((st.n / prev) * 100) : null;
+    const extra = st.money && st.n
+      ? ` · <b>${fmtEur.format((s.revenue || 0) / 100)}</b>`
+      : "";
+    return `<div class="funnel-row">
+      <div class="funnel-top">
+        <span class="funnel-label">${st.label}</span>
+        <span class="funnel-num">${fmtInt.format(st.n)} <span class="funnel-pct">${p}%</span></span>
+      </div>
+      <div class="funnel-bar"><span style="width:${Math.max(p, 1.5)}%"></span></div>
+      <div class="funnel-hint">${st.hint}${stepConv !== null ? ` · ${stepConv}% do passo anterior` : ""}${extra}</div>
+    </div>`;
+  }).join("");
+  return `<div class="card section-gap">
+    <div class="card-head"><h2>Funil de conversão</h2><div class="spacer"></div><div class="sub">% de quem recebeu o link</div></div>
+    <div class="funnel">${rows}</div>
+  </div>`;
+}
+
 function setupNoticeHtml() {
   if (data.igConfigured || data.fbConfigured) return "";
   return `<div class="card section-gap" style="border-color:#f3dfae;background:#fffbf0">
@@ -184,6 +229,7 @@ function renderOverview() {
   mainView.innerHTML = `
     ${setupNoticeHtml()}
     ${kpisHtml()}
+    ${funnelHtml()}
     <div class="card">
       <div class="card-head"><h2>Atividade recente</h2><div class="spacer"></div><div class="sub">últimos ${recent.length || 0} comentários</div></div>
       ${recent.length ? recent.map(actRowHtml).join("") : emptyActivityHtml()}

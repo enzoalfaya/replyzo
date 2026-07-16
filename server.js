@@ -22,6 +22,7 @@ import {
   listAutomationEvents,
   automationStats,
   recordLinkClick,
+  recordFunnelStep,
   getEventByToken,
   resetClicks,
   markConversion,
@@ -91,13 +92,29 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 // "aberto" segundos depois de enviado.
 const BOT_UA_RE =
   /bot|crawl|spider|preview|scan|fetch|facebookexternalhit|facebot|meta-externalagent|whatsapp|telegram|skype|slack|discord|curl|wget|python|axios|headless/i;
+const isBot = (ua) => !ua || BOT_UA_RE.test(ua);
 
 app.get("/r/:token", (req, res) => {
   const ua = String(req.get("user-agent") || "");
-  const isBot = !ua || BOT_UA_RE.test(ua);
-  const ev = isBot ? getEventByToken(req.params.token) : recordLinkClick(req.params.token);
+  const ev = isBot(ua) ? getEventByToken(req.params.token) : recordLinkClick(req.params.token);
   if (!ev || !ev.link_url) return res.status(404).send("Este link já não está disponível.");
   res.redirect(302, ev.link_url);
+});
+
+// Beacon do funil: /px.js (no teu site) chama isto quando alguém clica em
+// "ver as 500 receitas" (step=cta) ou chega à página de vendas (step=sales).
+// Responde sempre com um GIF 1x1 transparente. Ignora bots (não executam JS,
+// mas filtramos na mesma por segurança).
+const PIXEL_GIF = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
+app.get("/t", (req, res) => {
+  if (!isBot(String(req.get("user-agent") || ""))) {
+    const token = String(req.query.token || "").replace(/^rzo_/, "").trim();
+    const step = String(req.query.step || "");
+    if (token && (step === "cta" || step === "sales")) recordFunnelStep(token, step);
+  }
+  res.set("Content-Type", "image/gif");
+  res.set("Cache-Control", "no-store");
+  res.end(PIXEL_GIF);
 });
 
 // Limpa TODAS as contagens de cliques (para zerar falsos positivos antigos).
