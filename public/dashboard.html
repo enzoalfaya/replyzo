@@ -140,6 +140,18 @@
       .section-gap { margin-bottom: 20px; }
 
       /* Funil de conversão */
+      .strat-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 18px 0; }
+      .strat-tab {
+        border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+        border-radius: 20px; padding: 6px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+        font-family: inherit; transition: all 0.15s;
+      }
+      .strat-tab:hover { border-color: #cdd0e0; color: var(--ink); }
+      .strat-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+      .strat-chip {
+        display: inline-block; font-size: 11px; font-weight: 700; color: var(--muted);
+        background: var(--bg); border: 1px solid var(--line); border-radius: 20px; padding: 1px 9px;
+      }
       .funnel { padding: 16px 18px; display: flex; flex-direction: column; gap: 16px; }
       .funnel-row { display: flex; flex-direction: column; gap: 5px; }
       .funnel-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
@@ -458,6 +470,19 @@
                 <label for="f-dm">Mensagem privada (DM)</label>
                 <textarea id="f-dm" name="dm_text" placeholder="Olá {nome}! 👋 Aqui está o link que pediste: https://…"></textarea>
                 <div class="hint">Enviada uma única vez por comentário (regra do Instagram). <button type="button" class="var-chip" data-insert="f-dm">＋ {nome}</button></div>
+              </div>
+              <div class="grid2" style="border-top:1px solid var(--line);padding-top:14px">
+                <div class="field">
+                  <label for="f-strategy">Estratégia</label>
+                  <input type="text" id="f-strategy" name="strategy" list="strategy-list" placeholder="Receita" autocomplete="off" />
+                  <datalist id="strategy-list"></datalist>
+                  <div class="hint">Agrupa o funil. Usa o mesmo nome em regras da mesma campanha.</div>
+                </div>
+                <div class="field">
+                  <label for="f-step-label">Nome do passo do meio</label>
+                  <input type="text" id="f-step-label" name="step_label" placeholder="Clicaram ver as 500 receitas" autocomplete="off" />
+                  <div class="hint">Ex.: "Concluíram o quiz". Como aparece no funil.</div>
+                </div>
               </div>
             </div>
 

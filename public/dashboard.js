@@ -16,6 +16,7 @@ let data = null; // ultimo payload de /api/automation
 let currentView = "overview";
 let editingId = null; // id da regra em edicao (null = nova)
 let armedDelete = null; // { id, timer } — apagar em dois passos
+let funnelStrategy = null; // estratégia selecionada no funil (null = todas)
 
 const VIEW_TITLES = {
   overview: ["Visão geral", "Comentários → resposta + DM, em piloto automático"],
@@ -124,6 +125,9 @@ async function onMainClick(e) {
   const goConn = e.target.closest("[data-go-connections]");
   if (goConn) { switchView("connections"); return; }
 
+  const strat = e.target.closest("button[data-strat]");
+  if (strat) { funnelStrategy = strat.dataset.strat || null; renderOverview(); return; }
+
   const edit = e.target.closest("button[data-edit]");
   if (edit) { openEditor(data.rules.find((r) => r.id === Number(edit.dataset.edit))); return; }
 
@@ -166,17 +170,13 @@ function kpisHtml() {
 }
 
 // Funil: do comentário à compra. Base = respostas com link enviado.
+// Com várias estratégias (Receita, Quiz...), mostra um seletor e o funil da
+// estratégia escolhida (ou "Todas" agregado).
 function funnelHtml() {
   const s = data.stats || {};
-  const base = s.withLink || 0;
-  const steps = [
-    { label: "Responderam com link", n: base, hint: "comentários que receberam o link" },
-    { label: "Abriram o link", n: s.clicked || 0, hint: "clicaram no link da resposta/DM" },
-    { label: 'Clicaram "ver as 500 receitas"', n: s.cta || 0, hint: "na página da receita" },
-    { label: "Foram à página de vendas", n: s.sales || 0, hint: "chegaram à página de vendas" },
-    { label: "Compraram", n: s.purchases || 0, hint: "concluíram a compra", money: true },
-  ];
-  if (!base) {
+  const strategies = (s.byStrategy || []).filter((x) => x.withLink > 0);
+
+  if (!(s.withLink > 0)) {
     return `<div class="card section-gap">
       <div class="card-head"><h2>Funil de conversão</h2></div>
       <div class="empty" style="padding:30px 20px">
@@ -186,26 +186,51 @@ function funnelHtml() {
       </div>
     </div>`;
   }
+
+  // Se a estratégia selecionada já não existe, volta a "Todas".
+  if (funnelStrategy && !strategies.some((x) => x.strategy === funnelStrategy)) funnelStrategy = null;
+  const multi = strategies.length > 1;
+
+  // Dados da vista atual: uma estratégia específica ou o agregado.
+  const view = funnelStrategy
+    ? strategies.find((x) => x.strategy === funnelStrategy)
+    : { ...s, stepLabel: "" };
+  const midLabel = view.stepLabel || (funnelStrategy ? "Avançaram na página" : "Passo do meio (CTA / quiz)");
+
+  const base = view.withLink || 0;
+  const steps = [
+    { label: "Responderam com link", n: base, hint: "comentários que receberam o link" },
+    { label: "Abriram o link", n: view.clicked || 0, hint: "clicaram no link da resposta/DM" },
+    { label: midLabel, n: view.cta || 0, hint: "ação na página de destino" },
+    { label: "Foram à página de vendas", n: view.sales || 0, hint: "chegaram à página de vendas" },
+    { label: "Compraram", n: view.purchases || 0, hint: "concluíram a compra", money: true },
+  ];
   const pct = (n) => (base ? Math.round((n / base) * 100) : 0);
   const rows = steps.map((st, i) => {
     const p = pct(st.n);
-    // conversão relativa ao passo anterior (só a partir do 2º)
     const prev = i > 0 ? steps[i - 1].n : st.n;
     const stepConv = i > 0 && prev > 0 ? Math.round((st.n / prev) * 100) : null;
-    const extra = st.money && st.n
-      ? ` · <b>${fmtEur.format((s.revenue || 0) / 100)}</b>`
-      : "";
+    const extra = st.money && st.n ? ` · <b>${fmtEur.format((view.revenue || 0) / 100)}</b>` : "";
     return `<div class="funnel-row">
       <div class="funnel-top">
-        <span class="funnel-label">${st.label}</span>
+        <span class="funnel-label">${escapeHtml(st.label)}</span>
         <span class="funnel-num">${fmtInt.format(st.n)} <span class="funnel-pct">${p}%</span></span>
       </div>
       <div class="funnel-bar"><span style="width:${Math.max(p, 1.5)}%"></span></div>
-      <div class="funnel-hint">${st.hint}${stepConv !== null ? ` · ${stepConv}% do passo anterior` : ""}${extra}</div>
+      <div class="funnel-hint">${escapeHtml(st.hint)}${stepConv !== null ? ` · ${stepConv}% do passo anterior` : ""}${extra}</div>
     </div>`;
   }).join("");
+
+  // Seletor de estratégias (só quando há mais do que uma).
+  const tab = (label, key) =>
+    `<button class="strat-tab ${(funnelStrategy || "") === (key || "") ? "active" : ""}" data-strat="${escapeHtml(key || "")}">${escapeHtml(label)}</button>`;
+  const tabs = multi
+    ? `<div class="strat-tabs">${tab("Todas", "")}${strategies.map((x) => tab(x.strategy, x.strategy)).join("")}</div>`
+    : "";
+
   return `<div class="card section-gap">
     <div class="card-head"><h2>Funil de conversão</h2><div class="spacer"></div><div class="sub">% de quem recebeu o link</div></div>
+    ${tabs}
     <div class="funnel">${rows}</div>
   </div>`;
 }
@@ -259,10 +284,11 @@ function kwVariants(keyword) {
 function ruleRowHtml(r) {
   const does = [r.reply_public ? "responde no comentário" : "", r.dm_text ? "envia DM" : ""].filter(Boolean).join(" + ") || "sem ação";
   const chips = kwVariants(r.keyword).map((k) => `<span class="kw-chip">${escapeHtml(k)}</span>`).join(" ");
+  const strat = r.strategy ? `<span class="strat-chip">${escapeHtml(r.strategy)}</span>` : "";
   return `<div class="rule-row ${r.active ? "" : "off"}">
     ${pbadge(r.platform)}
     <div class="rule-mid">
-      <div class="rule-kw">${chips}</div>
+      <div class="rule-kw">${chips}${strat}</div>
       <div class="rule-meta">${MATCH_NAMES[r.match_type] || r.match_type} · ${does}</div>
     </div>
     <div class="rule-acts">
@@ -390,6 +416,8 @@ function bindEditor() {
       match_type: editorForm.match_type.value,
       reply_public: editorForm.reply_public.value.trim(),
       dm_text: editorForm.dm_text.value.trim(),
+      strategy: editorForm.strategy.value.trim(),
+      step_label: editorForm.step_label.value.trim(),
     };
     if (!body.keyword) { msg.textContent = "Falta a palavra que dispara."; return; }
     if (!body.reply_public && !body.dm_text) { msg.textContent = "Escreve pelo menos a resposta ou a DM."; return; }
@@ -411,6 +439,11 @@ function openEditor(rule) {
   editorForm.match_type.value = rule?.match_type || "contains";
   editorForm.reply_public.value = rule?.reply_public || "";
   editorForm.dm_text.value = rule?.dm_text || "";
+  editorForm.strategy.value = rule?.strategy || "";
+  editorForm.step_label.value = rule?.step_label || "";
+  // Sugestões de estratégias já usadas (autocomplete).
+  const known = [...new Set((data?.rules || []).map((r) => r.strategy).filter(Boolean))];
+  document.getElementById("strategy-list").innerHTML = known.map((s) => `<option value="${escapeHtml(s)}"></option>`).join("");
   syncPreview();
   editor.hidden = false;
   document.getElementById("f-keyword").focus();

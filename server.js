@@ -168,6 +168,8 @@ app.post("/api/automation/rules", requireDash, (req, res) => {
       ...(b.reply_public != null ? { reply_public: b.reply_public } : {}),
       ...(b.dm_text != null ? { dm_text } : {}),
       ...(b.active != null ? { active: b.active } : {}),
+      ...(b.strategy != null ? { strategy: b.strategy } : {}),
+      ...(b.step_label != null ? { step_label: b.step_label } : {}),
     });
     return res.json({ ok, rule: getRule(b.id) });
   }
@@ -178,6 +180,8 @@ app.post("/api/automation/rules", requireDash, (req, res) => {
     reply_public: b.reply_public || "",
     dm_text,
     active: b.active != null ? b.active : 1,
+    strategy: b.strategy || "",
+    step_label: b.step_label || "",
   });
   if (!id) return res.status(500).json({ ok: false, error: "Não foi possível criar a regra." });
   res.json({ ok: true, rule: getRule(id) });
