@@ -174,7 +174,9 @@ function kpisHtml() {
 // estratégia escolhida (ou "Todas" agregado).
 function funnelHtml() {
   const s = data.stats || {};
-  const strategies = (s.byStrategy || []).filter((x) => x.withLink > 0);
+  // Todas as estratégias (incl. etiquetadas sem dados ainda) — o seletor aparece
+  // assim que houver mais do que uma.
+  const strategies = s.byStrategy || [];
 
   if (!(s.withLink > 0)) {
     return `<div class="card section-gap">

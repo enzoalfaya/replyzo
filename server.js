@@ -26,6 +26,7 @@ import {
   getEventByToken,
   resetClicks,
   markConversion,
+  backfillEventStrategies,
 } from "./lib/db.js";
 import {
   metaVerifyChallenge,
@@ -172,6 +173,8 @@ app.post("/api/automation/rules", requireDash, (req, res) => {
       ...(b.strategy != null ? { strategy: b.strategy } : {}),
       ...(b.step_label != null ? { step_label: b.step_label } : {}),
     });
+    // Etiquetar uma regra reclassifica logo os eventos antigos que ela gerou.
+    backfillEventStrategies();
     return res.json({ ok, rule: getRule(b.id) });
   }
   const id = createRule({
@@ -185,6 +188,7 @@ app.post("/api/automation/rules", requireDash, (req, res) => {
     step_label: b.step_label || "",
   });
   if (!id) return res.status(500).json({ ok: false, error: "Não foi possível criar a regra." });
+  backfillEventStrategies();
   res.json({ ok: true, rule: getRule(id) });
 });
 
@@ -267,6 +271,10 @@ app.listen(PORT, () => {
   }
   if (!igConfigured()) console.log("  [aviso] Instagram por configurar (IG_USER_ID / IG_ACCESS_TOKEN).");
   if (!fbConfigured()) console.log("  [aviso] Facebook por configurar (PAGE_ACCESS_TOKEN).");
+
+  // Reclassifica eventos antigos com a estratégia atual das regras.
+  const n = backfillEventStrategies();
+  if (n) console.log(`  [funil] ${n} eventos reclassificados por estratégia`);
 
   // Garante a subscricao da conta IG aos webhooks de comentarios (idempotente).
   if (igConfigured()) {
