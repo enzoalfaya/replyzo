@@ -35,6 +35,8 @@ import {
   igConfigured,
   fbConfigured,
   igSubscribeApp,
+  refreshIgToken,
+  diagnostics,
 } from "./lib/social.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -192,6 +194,11 @@ app.post("/api/automation/rules", requireDash, (req, res) => {
   res.json({ ok: true, rule: getRule(id) });
 });
 
+// Diagnóstico da saúde dos tokens (IG/FB ainda válidos junto da Meta?).
+app.get("/api/diag", requireDash, async (_req, res) => {
+  res.json(await diagnostics());
+});
+
 // Apagar uma regra.
 app.delete("/api/automation/rules/:id", requireDash, (req, res) => {
   const ok = deleteRule(req.params.id);
@@ -276,10 +283,23 @@ app.listen(PORT, () => {
   const n = backfillEventStrategies();
   if (n) console.log(`  [funil] ${n} eventos reclassificados por estratégia`);
 
-  // Garante a subscricao da conta IG aos webhooks de comentarios (idempotente).
+  // Auto-renova o token IG (só renova de facto se já passaram >2 dias) e depois
+  // garante a subscricao da conta aos webhooks de comentarios (idempotente).
   if (igConfigured()) {
-    igSubscribeApp().then((r) =>
-      console.log(r.ok ? "  [ig] conta subscrita aos comentarios ✓" : `  [ig] subscricao falhou: ${r.error}`)
-    );
+    const renovaEsubscreve = () =>
+      refreshIgToken()
+        .then((r) => {
+          if (r.ok && !r.skipped) console.log(`  [ig] token renovado (+${r.expiresInDays} dias)`);
+          else if (!r.ok) console.warn(`  [ig] renovacao falhou: ${r.error}`);
+          return igSubscribeApp();
+        })
+        .then((r) =>
+          console.log(r.ok ? "  [ig] conta subscrita aos comentarios ✓" : `  [ig] subscricao falhou: ${r.error}`)
+        );
+    renovaEsubscreve();
+    // Volta a tentar renovar 1x por dia enquanto o servico estiver de pe.
+    setInterval(() => refreshIgToken().then((r) => {
+      if (r.ok && !r.skipped) console.log(`  [ig] token renovado (+${r.expiresInDays} dias)`);
+    }), 24 * 60 * 60 * 1000);
   }
 });
