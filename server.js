@@ -64,17 +64,35 @@ app.get("/webhooks/meta", (req, res) => {
   return res.sendStatus(403);
 });
 
+// Registo em memoria dos ultimos webhooks recebidos. Serve para diagnosticar
+// "a Meta esta mesmo a entregar isto?" — visivel em GET /api/webhooks/recent.
+const RECENT_HOOKS = [];
+function noteHook(info) {
+  RECENT_HOOKS.unshift({ at: new Date().toISOString(), ...info });
+  if (RECENT_HOOKS.length > 80) RECENT_HOOKS.length = 80;
+}
+
 app.post("/webhooks/meta", express.raw({ type: "application/json" }), (req, res) => {
-  if (!verifyMetaSignature(req.body, req.get("x-hub-signature-256"))) {
+  const sigOk = verifyMetaSignature(req.body, req.get("x-hub-signature-256"));
+  let peek = null;
+  try {
+    peek = JSON.parse(req.body.toString("utf8"));
+  } catch {
+    /* corpo nao-JSON: fica registado na mesma, abaixo */
+  }
+  noteHook({
+    sigOk,
+    object: peek?.object || null,
+    fields: (peek?.entry || []).flatMap((e) => (e.changes || []).map((c) => c.field)),
+    raw: req.body.toString("utf8").slice(0, 700),
+  });
+
+  if (!sigOk) {
     console.warn("[meta] assinatura invalida — evento ignorado.");
     return res.sendStatus(401);
   }
-  let body;
-  try {
-    body = JSON.parse(req.body.toString("utf8"));
-  } catch {
-    return res.sendStatus(400);
-  }
+  const body = peek;
+  if (!body) return res.sendStatus(400);
   // Responde JA (200) para a Meta nao repetir; processa a seguir sem bloquear.
   res.sendStatus(200);
   processMetaWebhook(body).catch((err) =>
@@ -197,6 +215,17 @@ app.post("/api/automation/rules", requireDash, (req, res) => {
 // Diagnóstico da saúde dos tokens (IG/FB ainda válidos junto da Meta?).
 app.get("/api/diag", requireDash, async (_req, res) => {
   res.json(await diagnostics());
+});
+
+// Últimos webhooks que a Meta nos entregou (memória, desde o último arranque).
+// Responde à pergunta "a Meta está mesmo a mandar os comentários do Instagram?".
+app.get("/api/webhooks/recent", requireDash, (_req, res) => {
+  const counts = {};
+  for (const h of RECENT_HOOKS) {
+    const k = `${h.object || "?"}:${h.fields?.join(",") || "?"}`;
+    counts[k] = (counts[k] || 0) + 1;
+  }
+  res.json({ total: RECENT_HOOKS.length, counts, hooks: RECENT_HOOKS });
 });
 
 // Apagar uma regra.
