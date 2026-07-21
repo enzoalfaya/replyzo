@@ -67,9 +67,15 @@ app.get("/webhooks/meta", (req, res) => {
 // Registo em memoria dos ultimos webhooks recebidos. Serve para diagnosticar
 // "a Meta esta mesmo a entregar isto?" — visivel em GET /api/webhooks/recent.
 const RECENT_HOOKS = [];
+// Contadores CUMULATIVOS (nunca apagados) — o buffer de 80 é enchido pelo FB e
+// podia esconder um webhook IG por evicção. Isto conta a verdade desde o arranque.
+const HOOK_TOTALS = { since: new Date().toISOString(), byObject: {}, lastIgAt: null };
 function noteHook(info) {
   RECENT_HOOKS.unshift({ at: new Date().toISOString(), ...info });
   if (RECENT_HOOKS.length > 80) RECENT_HOOKS.length = 80;
+  const obj = info.object || "desconhecido";
+  HOOK_TOTALS.byObject[obj] = (HOOK_TOTALS.byObject[obj] || 0) + 1;
+  if (obj === "instagram") HOOK_TOTALS.lastIgAt = new Date().toISOString();
 }
 
 app.post("/webhooks/meta", express.raw({ type: "application/json" }), (req, res) => {
@@ -225,7 +231,7 @@ app.get("/api/webhooks/recent", requireDash, (_req, res) => {
     const k = `${h.object || "?"}:${h.fields?.join(",") || "?"}`;
     counts[k] = (counts[k] || 0) + 1;
   }
-  res.json({ total: RECENT_HOOKS.length, counts, hooks: RECENT_HOOKS });
+  res.json({ totals: HOOK_TOTALS, total: RECENT_HOOKS.length, counts, hooks: RECENT_HOOKS });
 });
 
 // Apagar uma regra.
