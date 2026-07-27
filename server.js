@@ -88,9 +88,10 @@ app.post("/webhooks/meta", express.raw({ type: "application/json" }), (req, res)
   }
   noteHook({
     sigOk,
+    sig: req.get("x-hub-signature-256") || null,
     object: peek?.object || null,
     fields: (peek?.entry || []).flatMap((e) => (e.changes || []).map((c) => c.field)),
-    raw: req.body.toString("utf8").slice(0, 700),
+    raw: req.body.toString("utf8").slice(0, 4000),
   });
 
   if (!sigOk) {
