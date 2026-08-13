@@ -396,6 +396,18 @@ function bindEditor() {
   editorForm.addEventListener("input", syncPreview);
   editorForm.addEventListener("change", syncPreview);
 
+  // Trocar de plataforma recarrega as publicações (as do IG não são as do FB).
+  editorForm.querySelectorAll('input[name="platform"]').forEach((radio) => {
+    radio.addEventListener("change", () => loadMedia(editorForm.platform.value, ""));
+  });
+
+  // Escolher a publicação (delegação: os cartões são criados dinamicamente).
+  document.getElementById("media-picker").addEventListener("click", (e) => {
+    const tile = e.target.closest(".media-tile");
+    if (!tile) return;
+    selectMedia(tile.dataset.media || "");
+  });
+
   // Chips "＋ {nome}": inserem a variável na posição do cursor.
   editorForm.querySelectorAll(".var-chip").forEach((chip) => {
     chip.addEventListener("click", () => {
@@ -420,6 +432,7 @@ function bindEditor() {
       dm_text: editorForm.dm_text.value.trim(),
       strategy: editorForm.strategy.value.trim(),
       step_label: editorForm.step_label.value.trim(),
+      media_id: document.getElementById("f-media").value,
     };
     if (!body.keyword) { msg.textContent = "Falta a palavra que dispara."; return; }
     if (!body.reply_public && !body.dm_text) { msg.textContent = "Escreve pelo menos a resposta ou a DM."; return; }
@@ -446,6 +459,7 @@ function openEditor(rule) {
   // Sugestões de estratégias já usadas (autocomplete).
   const known = [...new Set((data?.rules || []).map((r) => r.strategy).filter(Boolean))];
   document.getElementById("strategy-list").innerHTML = known.map((s) => `<option value="${escapeHtml(s)}"></option>`).join("");
+  loadMedia(rule?.platform || "ig", rule?.media_id || "");
   syncPreview();
   editor.hidden = false;
   document.getElementById("f-keyword").focus();
@@ -454,6 +468,54 @@ function openEditor(rule) {
 function closeEditor() {
   editor.hidden = true;
   editingId = null;
+}
+
+// ----- Escolher a publicação --------------------------------------------------
+// Guarda as publicações já carregadas por plataforma, para não ir buscá-las à
+// Meta de cada vez que se abre o editor.
+const mediaCache = {};
+
+/** Marca visualmente a publicação escolhida e guarda-a no campo escondido. */
+function selectMedia(id) {
+  document.getElementById("f-media").value = id;
+  document.querySelectorAll("#media-picker .media-tile").forEach((t) => {
+    t.setAttribute("aria-pressed", String((t.dataset.media || "") === id));
+  });
+}
+
+async function loadMedia(platform, selected) {
+  const box = document.getElementById("media-picker");
+  const todas = `<button type="button" class="media-tile all" data-media="" aria-pressed="true">
+      <span class="mt-ico">🌐</span><span>Todas as publicações</span></button>`;
+
+  const render = (media) => {
+    box.innerHTML =
+      todas +
+      media
+        .map((m) => {
+          const n = m.comments != null ? `<span class="mt-n">${m.comments}</span>` : "";
+          const img = m.thumb
+            ? `<img src="${escapeHtml(m.thumb)}" alt="" loading="lazy" />`
+            : `<div style="height:88px"></div>`;
+          return `<button type="button" class="media-tile" data-media="${escapeHtml(m.id)}" aria-pressed="false" title="${escapeHtml(m.caption)}">
+              ${img}${n}<span class="mt-cap">${escapeHtml(m.caption || "sem legenda")}</span></button>`;
+        })
+        .join("");
+    selectMedia(selected || "");
+  };
+
+  if (mediaCache[platform]) { render(mediaCache[platform]); return; }
+  box.innerHTML = todas + `<div class="media-empty">a carregar publicações…</div>`;
+  const r = await api(`/api/media?platform=${platform}`);
+  if (r && r.ok) { mediaCache[platform] = r.media; render(r.media); }
+  else {
+    box.innerHTML = todas;
+    selectMedia(selected || "");
+    const warn = document.createElement("div");
+    warn.className = "media-empty";
+    warn.textContent = "Não deu para carregar as publicações — a regra vale para todas.";
+    box.appendChild(warn);
+  }
 }
 
 // Substitui {nome}/{name} — igual ao servidor, para a pré-visualização bater certo.

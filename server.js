@@ -37,6 +37,7 @@ import {
   igSubscribeApp,
   refreshIgToken,
   pollInstagramComments,
+  listMedia,
   diagnostics,
 } from "./lib/social.js";
 
@@ -188,8 +189,9 @@ app.post("/api/automation/rules", requireDash, (req, res) => {
   if (!b.id && (!platform || !String(b.keyword || "").trim())) {
     return res.status(400).json({ ok: false, error: "Faltam 'platform' (ig|fb) e 'keyword'." });
   }
-  // Facebook só faz resposta pública (sem DM) — descarta dm_text por segurança.
-  const dm_text = platform === "fb" ? "" : b.dm_text || "";
+  // O Facebook TAMBEM manda DM agora (Messenger) — e alias a unica forma de o
+  // link ficar clicavel em comentarios de anuncios.
+  const dm_text = b.dm_text || "";
   if (b.id) {
     const ok = updateRule(b.id, {
       ...(b.platform ? { platform } : {}),
@@ -200,6 +202,7 @@ app.post("/api/automation/rules", requireDash, (req, res) => {
       ...(b.active != null ? { active: b.active } : {}),
       ...(b.strategy != null ? { strategy: b.strategy } : {}),
       ...(b.step_label != null ? { step_label: b.step_label } : {}),
+      ...(b.media_id != null ? { media_id: b.media_id } : {}),
     });
     // Etiquetar uma regra reclassifica logo os eventos antigos que ela gerou.
     backfillEventStrategies();
@@ -214,6 +217,7 @@ app.post("/api/automation/rules", requireDash, (req, res) => {
     active: b.active != null ? b.active : 1,
     strategy: b.strategy || "",
     step_label: b.step_label || "",
+    media_id: b.media_id || "",
   });
   if (!id) return res.status(500).json({ ok: false, error: "Não foi possível criar a regra." });
   backfillEventStrategies();
@@ -253,6 +257,13 @@ app.post("/api/ig/subscribe", requireDash, async (_req, res) => {
 // esperar pelo intervalo). Devolve quantos comentarios viu e quantos tratou.
 app.post("/api/ig/poll", requireDash, async (_req, res) => {
   const r = await pollInstagramComments();
+  res.status(r.ok ? 200 : 400).json(r);
+});
+
+// Publicacoes recentes (com miniatura) para escolher a que a regra se aplica.
+app.get("/api/media", requireDash, async (req, res) => {
+  const platform = req.query.platform === "fb" ? "fb" : "ig";
+  const r = await listMedia(platform, 24);
   res.status(r.ok ? 200 : 400).json(r);
 });
 
