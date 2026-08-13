@@ -169,6 +169,81 @@ function kpisHtml() {
   </div>`;
 }
 
+// ---- Desempenho por rede (Instagram vs Facebook) ----------------------------
+const PLAT_INFO = {
+  ig: { nome: "Instagram", cor: "var(--ig-solid)", icone: "◎" },
+  fb: { nome: "Facebook", cor: "var(--fb)", icone: "f" },
+};
+
+function platformsHtml() {
+  const por = (data.stats || {}).byPlatform || {};
+  const redes = ["ig", "fb"];
+  // Maior total das duas: serve de escala para as barrinhas comparativas.
+  const teto = Math.max(1, ...redes.map((p) => (por[p] || {}).total || 0));
+  const ativas = (r) => (data.rules || []).filter((x) => x.active && x.platform === r).length;
+
+  const cartao = (p) => {
+    const s = por[p] || {};
+    const info = PLAT_INFO[p];
+    const linha = (rot, val, extra = "") =>
+      `<div class="pl-line"><span>${rot}</span><b>${val}</b>${extra}</div>`;
+    const taxa = s.dms && s.clicked ? Math.round((s.clicked / s.dms) * 100) : null;
+    return `<div class="card plat-card" style="--pc:${info.cor}">
+      <div class="pl-head">
+        <span class="pl-ico">${info.icone}</span>
+        <h3>${info.nome}</h3>
+        <div class="spacer"></div>
+        <span class="pl-tag">${fmtInt.format(ativas(p))} ativa${ativas(p) === 1 ? "" : "s"}</span>
+      </div>
+      <div class="pl-big">
+        <div><b>${fmtInt.format(s.total || 0)}</b><span>comentários tratados</span></div>
+        <div class="pl-today">${fmtInt.format(s.today || 0)} hoje</div>
+      </div>
+      <div class="pl-bar"><i style="width:${Math.round(((s.total || 0) / teto) * 100)}%"></i></div>
+      <div class="pl-lines">
+        ${linha("Respostas públicas", fmtInt.format(s.publics || 0))}
+        ${linha("DMs enviadas", fmtInt.format(s.dms || 0))}
+        ${linha("Abriram o link", fmtInt.format(s.clicked || 0), taxa != null ? `<em>${taxa}%</em>` : "")}
+        ${linha("Vendas", fmtInt.format(s.purchases || 0), s.revenue ? `<em>${fmtEur.format(s.revenue / 100)}</em>` : "")}
+        ${s.errors ? `<div class="pl-line err"><span>Erros</span><b>${fmtInt.format(s.errors)}</b></div>` : ""}
+      </div>
+    </div>`;
+  };
+
+  return `<div class="plat-grid section-gap">${redes.map(cartao).join("")}</div>`;
+}
+
+// ---- Gráfico dos últimos 14 dias --------------------------------------------
+function chartHtml() {
+  const serie = (data.stats || {}).serie || [];
+  if (!serie.length || !serie.some((d) => d.ig || d.fb)) return "";
+  const teto = Math.max(1, ...serie.map((d) => Math.max(d.ig, d.fb)));
+  const dias = serie
+    .map((d) => {
+      const dt = new Date(d.dia * 1000);
+      const rot = `${dt.getDate()}/${dt.getMonth() + 1}`;
+      const alt = (n) => Math.max(n ? 3 : 0, Math.round((n / teto) * 100));
+      return `<div class="ch-day" title="${rot} · Instagram ${d.ig} · Facebook ${d.fb}">
+        <div class="ch-bars">
+          <i class="ig" style="height:${alt(d.ig)}%"></i>
+          <i class="fb" style="height:${alt(d.fb)}%"></i>
+        </div>
+        <span>${rot}</span>
+      </div>`;
+    })
+    .join("");
+  return `<div class="card section-gap">
+    <div class="card-head">
+      <h2>Últimos 14 dias</h2>
+      <div class="spacer"></div>
+      <div class="ch-legend">
+        <span><i class="ig"></i>Instagram</span><span><i class="fb"></i>Facebook</span>
+      </div>
+    </div>
+    <div class="chart">${dias}</div>
+  </div>`;
+}
+
 // Funil: do comentário à compra. Base = respostas com link enviado.
 // Com várias estratégias (Receita, Quiz...), mostra um seletor e o funil da
 // estratégia escolhida (ou "Todas" agregado).
@@ -256,6 +331,8 @@ function renderOverview() {
   mainView.innerHTML = `
     ${setupNoticeHtml()}
     ${kpisHtml()}
+    ${platformsHtml()}
+    ${chartHtml()}
     ${funnelHtml()}
     <div class="card">
       <div class="card-head"><h2>Atividade recente</h2><div class="spacer"></div><div class="sub">últimos ${recent.length || 0} comentários</div></div>
@@ -562,6 +639,10 @@ function closeEditor() {
 // Guarda as publicações já carregadas por plataforma, para não ir buscá-las à
 // Meta de cada vez que se abre o editor.
 const mediaCache = {};
+// Contador de pedidos: se o utilizador trocar de rede enquanto o pedido
+// anterior ainda vem a caminho, a resposta atrasada é descartada (senão as
+// publicações do Instagram apareciam por cima das do Facebook).
+let mediaReq = 0;
 
 /** Marca visualmente a publicação escolhida e guarda-a no campo escondido. */
 function selectMedia(id) {
@@ -573,6 +654,7 @@ function selectMedia(id) {
 
 async function loadMedia(platform, selected) {
   const box = document.getElementById("media-picker");
+  const req = ++mediaReq; // só a resposta mais recente pode desenhar
   const todas = `<button type="button" class="media-tile all" data-media="" aria-pressed="true">
       <span class="mt-ico">🌐</span><span>Todas as publicações</span></button>`;
 
@@ -595,6 +677,7 @@ async function loadMedia(platform, selected) {
   if (mediaCache[platform]) { render(mediaCache[platform]); return; }
   box.innerHTML = todas + `<div class="media-empty">a carregar publicações…</div>`;
   const r = await api(`/api/media?platform=${platform}`);
+  if (req !== mediaReq) return; // já se trocou de rede: ignora esta resposta
   if (r && r.ok) { mediaCache[platform] = r.media; render(r.media); }
   else {
     box.innerHTML = todas;
