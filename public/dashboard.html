@@ -356,6 +356,26 @@
       .ch-legend i.ig { background: var(--ig-solid); }
       .ch-legend i.fb { background: var(--fb); }
 
+      /* ---------- Formato da DM: texto ou botão ---------- */
+      .tpl-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .tpl {
+        border: 2px solid var(--line); border-radius: 12px; background: var(--surface);
+        padding: 12px; cursor: pointer; text-align: center; font: inherit; transition: border-color .15s;
+        display: flex; flex-direction: column; align-items: center; gap: 3px;
+      }
+      .tpl:hover { border-color: var(--primary); }
+      .tpl[aria-pressed="true"] { border-color: var(--primary); background: var(--primary-soft); }
+      .tpl-ico { font-size: 19px; line-height: 1; }
+      .tpl b { font-size: 13.5px; color: var(--ink); }
+      .tpl small { font-size: 11px; color: var(--muted); line-height: 1.3; }
+
+      /* Botão na pré-visualização (imita o botão da Meta) */
+      .pv-btn {
+        margin-top: -4px; padding: 9px; text-align: center; border-radius: 12px;
+        background: var(--surface); border: 1px solid var(--line);
+        font-size: 12.5px; font-weight: 700; color: var(--primary-dark);
+      }
+
       /* ---------- Assistente por passos ---------- */
       .wiz-steps {
         display: flex; gap: 4px; padding: 12px 22px; border-bottom: 1px solid var(--line);
@@ -690,8 +710,37 @@
                 </div>
                 <div id="dm-wrap">
                   <div class="field">
+                    <label>Formato da mensagem</label>
+                    <div class="tpl-pick" id="tpl-pick">
+                      <button type="button" class="tpl" data-kind="text" aria-pressed="true">
+                        <span class="tpl-ico">🔗</span>
+                        <b>Texto</b>
+                        <small>O link vai no meio do texto</small>
+                      </button>
+                      <button type="button" class="tpl" data-kind="button" aria-pressed="false">
+                        <span class="tpl-ico">▭</span>
+                        <b>Botão</b>
+                        <small>Um botão clicável por baixo do texto</small>
+                      </button>
+                    </div>
+                    <input type="hidden" id="f-dm-kind" value="text" />
+                  </div>
+                  <div class="field">
+                    <label for="f-dm">Texto da mensagem</label>
                     <textarea id="f-dm" name="dm_text" rows="6" placeholder="Olá {nome}! 👋 Aqui está o link que pediste: https://…"></textarea>
                     <div class="hint">Enviada uma única vez por comentário (regra da Meta). <button type="button" class="var-chip" data-insert="f-dm">＋ {nome}</button></div>
+                  </div>
+                  <div class="grid2" id="btn-fields" hidden>
+                    <div class="field">
+                      <label for="f-btn-label">Texto do botão</label>
+                      <input type="text" id="f-btn-label" maxlength="20" placeholder="Ver as 500 receitas" autocomplete="off" />
+                      <div class="hint">Máximo 20 caracteres (limite da Meta).</div>
+                    </div>
+                    <div class="field">
+                      <label for="f-btn-url">Link do botão</label>
+                      <input type="text" id="f-btn-url" placeholder="https://500receitas.site/…" autocomplete="off" />
+                      <div class="hint">Contamos os cliques e ligamos a venda a este comentário.</div>
+                    </div>
                   </div>
                 </div>
 
@@ -727,6 +776,7 @@
                   <div class="dm-block" id="pv-dm-block">
                     <div class="dm-sep">na caixa de mensagens</div>
                     <div class="bubble dm"><span id="pv-dm" class="ph-empty">sem mensagem privada</span></div>
+                  <div class="pv-btn" id="pv-btn" hidden></div>
                   </div>
                 </div>
               </div>

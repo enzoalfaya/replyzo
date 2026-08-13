@@ -205,6 +205,9 @@ app.post("/api/automation/rules", requireDash, (req, res) => {
       ...(b.media_id != null ? { media_id: b.media_id } : {}),
       ...(b.replies_json != null ? { replies_json: b.replies_json } : {}),
       ...(b.once_per_user != null ? { once_per_user: b.once_per_user } : {}),
+      ...(b.dm_kind != null ? { dm_kind: b.dm_kind === "button" ? "button" : "text" } : {}),
+      ...(b.dm_btn_label != null ? { dm_btn_label: b.dm_btn_label } : {}),
+      ...(b.dm_btn_url != null ? { dm_btn_url: b.dm_btn_url } : {}),
     });
     // Etiquetar uma regra reclassifica logo os eventos antigos que ela gerou.
     backfillEventStrategies();
@@ -222,6 +225,9 @@ app.post("/api/automation/rules", requireDash, (req, res) => {
     media_id: b.media_id || "",
     replies_json: b.replies_json || "",
     once_per_user: b.once_per_user || 0,
+    dm_kind: b.dm_kind === "button" ? "button" : "text",
+    dm_btn_label: b.dm_btn_label || "",
+    dm_btn_url: b.dm_btn_url || "",
   });
   if (!id) return res.status(500).json({ ok: false, error: "Não foi possível criar a regra." });
   backfillEventStrategies();

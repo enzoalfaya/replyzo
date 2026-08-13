@@ -529,6 +529,13 @@ function bindEditor() {
   document.getElementById("t-reply").addEventListener("change", () => liga("t-reply", "reply-wrap"));
   document.getElementById("t-dm").addEventListener("change", () => liga("t-dm", "dm-wrap"));
 
+  // Escolher o formato da DM: texto simples ou com botão clicável.
+  document.getElementById("tpl-pick").addEventListener("click", (e) => {
+    const b = e.target.closest(".tpl");
+    if (!b) return;
+    setDmKind(b.dataset.kind);
+  });
+
   // Procurar publicação pela legenda.
   document.getElementById("media-search").addEventListener("input", (e) => {
     const q = e.target.value.trim().toLowerCase();
@@ -559,9 +566,18 @@ function bindEditor() {
       step_label: editorForm.step_label.value.trim(),
       media_id: document.getElementById("f-media").value,
       once_per_user: document.getElementById("t-once").checked ? 1 : 0,
+      dm_kind: document.getElementById("f-dm-kind").value,
+      dm_btn_label: document.getElementById("f-btn-label").value.trim(),
+      dm_btn_url: document.getElementById("f-btn-url").value.trim(),
     };
+    // Sem DM ligada, o botão não faz sentido: limpa para não confundir depois.
+    if (!dm && body.dm_kind === "button") body.dm_kind = "text";
     if (!body.keyword) { msg.textContent = "Falta a palavra que dispara (passo 3)."; goStep(3); return; }
-    if (!body.reply_public && !body.dm_text) { msg.textContent = "Escreve pelo menos uma resposta ou a mensagem privada."; return; }
+    if (body.dm_kind === "button" && !body.dm_btn_url) {
+      msg.textContent = "Escolheste o formato Botão — falta o link do botão.";
+      return;
+    }
+    if (!body.reply_public && !body.dm_text && !body.dm_btn_url) { msg.textContent = "Escreve pelo menos uma resposta ou a mensagem privada."; return; }
     msg.textContent = "";
     const r = await api("/api/automation/rules", { method: "POST", body });
     if (r && r.ok) { closeEditor(); load(); }
@@ -599,6 +615,9 @@ function openEditor(rule) {
   document.getElementById("t-once").checked = Boolean(rule?.once_per_user);
   document.getElementById("reply-wrap").classList.toggle("is-off", !document.getElementById("t-reply").checked);
   document.getElementById("dm-wrap").classList.toggle("is-off", !document.getElementById("t-dm").checked);
+  document.getElementById("f-btn-label").value = rule?.dm_btn_label || "";
+  document.getElementById("f-btn-url").value = rule?.dm_btn_url || "";
+  setDmKind(rule?.dm_kind === "button" ? "button" : "text");
   document.getElementById("media-search").value = "";
   goStep(1);
   // Sugestões de estratégias já usadas (autocomplete).
@@ -618,6 +637,17 @@ function ultimaCaixaResposta() {
 document.addEventListener("focusin", (e) => {
   if (e.target.matches("#rep-list .rep-row textarea")) ultimaResposta = e.target;
 });
+
+/** Escolhe o formato da DM ('text' ou 'button') e mostra os campos certos. */
+function setDmKind(kind) {
+  const k = kind === "button" ? "button" : "text";
+  document.getElementById("f-dm-kind").value = k;
+  document.querySelectorAll("#tpl-pick .tpl").forEach((b) => {
+    b.setAttribute("aria-pressed", String(b.dataset.kind === k));
+  });
+  document.getElementById("btn-fields").hidden = k !== "button";
+  syncPreview();
+}
 
 /** Valida o passo antes de deixar avançar. */
 function validaPasso(n) {
@@ -718,6 +748,13 @@ function syncPreview() {
   setBubble("pv-reply", reply, "sem resposta pública");
   setBubble("pv-dm", dm, "sem mensagem privada");
   document.getElementById("pv-reply-wrap").hidden = false;
+
+  // Botão da DM (só quando o formato "Botão" está escolhido).
+  const btn = document.getElementById("pv-btn");
+  const comBotao =
+    document.getElementById("t-dm").checked && document.getElementById("f-dm-kind").value === "button";
+  btn.hidden = !comBotao;
+  if (comBotao) btn.textContent = document.getElementById("f-btn-label").value.trim() || "Abrir";
 
   // Quantas respostas diferentes existem (mostra que vão sair à vez).
   const extra = document.getElementById("pv-extra");
