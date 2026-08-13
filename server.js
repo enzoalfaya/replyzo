@@ -38,6 +38,7 @@ import {
   refreshIgToken,
   pollInstagramComments,
   listMedia,
+  backfillComments,
   diagnostics,
 } from "./lib/social.js";
 
@@ -267,6 +268,19 @@ app.post("/api/ig/subscribe", requireDash, async (_req, res) => {
 // esperar pelo intervalo). Devolve quantos comentarios viu e quantos tratou.
 app.post("/api/ig/poll", requireDash, async (_req, res) => {
   const r = await pollInstagramComments();
+  res.status(r.ok ? 200 : 400).json(r);
+});
+
+// Recuperar comentarios antigos de uma publicacao (os que ficaram por
+// responder antes de a automacao existir). Por defeito SIMULA — so envia com
+// dry_run=false, para nunca disparar um envio em massa por engano.
+app.post("/api/backfill", requireDash, async (req, res) => {
+  const b = req.body || {};
+  const platform = b.platform === "ig" ? "ig" : "fb";
+  const r = await backfillComments(platform, String(b.media_id || ""), {
+    limit: Math.min(200, Math.max(1, Number(b.limit) || 30)),
+    dryRun: b.dry_run !== false,
+  });
   res.status(r.ok ? 200 : 400).json(r);
 });
 
