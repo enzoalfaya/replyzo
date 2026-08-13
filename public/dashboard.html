@@ -695,7 +695,10 @@
                 <div id="reply-wrap">
                   <div class="rep-list" id="rep-list"></div>
                   <button type="button" class="rep-add" id="rep-add">＋ Adicionar mais uma resposta</button>
-                  <div class="hint" style="margin-top:8px"><button type="button" class="var-chip" data-insert="__last-reply">＋ {nome}</button> insere o nome de quem comentou.</div>
+                  <div class="hint" style="margin-top:8px">
+                    <button type="button" class="var-chip" data-insert="__last-reply">＋ {nome}</button> o nome de quem comentou ·
+                    <button type="button" class="var-chip" data-insert="__last-reply" data-var="{mencao}">＋ {mencao}</button> menção <b>clicável</b> ao perfil
+                  </div>
                 </div>
               </section>
 
@@ -728,7 +731,10 @@
                   <div class="field">
                     <label for="f-dm">Texto da mensagem</label>
                     <textarea id="f-dm" name="dm_text" rows="6" placeholder="Olá {nome}! 👋 Aqui está o link que pediste: https://…"></textarea>
-                    <div class="hint">Enviada uma única vez por comentário (regra da Meta). <button type="button" class="var-chip" data-insert="f-dm">＋ {nome}</button></div>
+                    <div class="hint">Enviada uma única vez por comentário (regra da Meta).
+                      <button type="button" class="var-chip" data-insert="f-dm">＋ {nome}</button>
+                      <button type="button" class="var-chip" data-insert="f-dm" data-var="{mencao}">＋ {mencao}</button>
+                    </div>
                   </div>
                   <div class="grid2" id="btn-fields" hidden>
                     <div class="field">

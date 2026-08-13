@@ -494,10 +494,11 @@ function bindEditor() {
           ? ultimaCaixaResposta()
           : document.getElementById(chip.dataset.insert);
       if (!ta) return;
+      const marca = chip.dataset.var || "{nome}";
       const pos = ta.selectionStart ?? ta.value.length;
-      ta.value = ta.value.slice(0, pos) + "{nome}" + ta.value.slice(ta.selectionEnd ?? pos);
+      ta.value = ta.value.slice(0, pos) + marca + ta.value.slice(ta.selectionEnd ?? pos);
       ta.focus();
-      ta.selectionStart = ta.selectionEnd = pos + 6;
+      ta.selectionStart = ta.selectionEnd = pos + marca.length;
       syncPreview();
     });
   });
@@ -737,12 +738,11 @@ function syncPreview() {
   const kw = repValues("kw-list")[0] || "";
   // O comentador de exemplo chama-se "cliente" — é isso que o {nome} vira aqui.
   const respostas = repValues("rep-list");
-  const reply = document.getElementById("t-reply").checked
-    ? applyTemplate(respostas[0] || "", "cliente")
-    : "";
-  const dm = document.getElementById("t-dm").checked
-    ? applyTemplate(document.getElementById("f-dm").value.trim(), "cliente")
-    : "";
+  // Na pré-visualização a menção aparece como o utilizador a verá.
+  const mencao = isFb ? "@Ana Silva" : "@ana.silva";
+  const vars = (t) => applyTemplate(String(t || "").replace(/\{\s*(?:men[cç][aã]o|mention)\s*\}/gi, mencao), "cliente");
+  const reply = document.getElementById("t-reply").checked ? vars(respostas[0] || "") : "";
+  const dm = document.getElementById("t-dm").checked ? vars(document.getElementById("f-dm").value.trim()) : "";
 
   document.getElementById("pv-comment").textContent = kw || "palavra-chave";
   setBubble("pv-reply", reply, "sem resposta pública");
