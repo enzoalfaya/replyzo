@@ -36,6 +36,7 @@ import {
   fbConfigured,
   igSubscribeApp,
   refreshIgToken,
+  pollInstagramComments,
   diagnostics,
 } from "./lib/social.js";
 
@@ -248,6 +249,13 @@ app.post("/api/ig/subscribe", requireDash, async (_req, res) => {
   res.status(r.ok ? 200 : 400).json(r);
 });
 
+// Forca uma sondagem imediata dos comentarios do Instagram (para testar sem
+// esperar pelo intervalo). Devolve quantos comentarios viu e quantos tratou.
+app.post("/api/ig/poll", requireDash, async (_req, res) => {
+  const r = await pollInstagramComments();
+  res.status(r.ok ? 200 : 400).json(r);
+});
+
 // -----------------------------------------------------------------------------
 //  Ping de conversao vindo do checkout: "o clique rzo_{token} comprou".
 //  Autenticado com o segredo partilhado CONVERSION_SECRET (cabecalho
@@ -312,30 +320,29 @@ app.listen(PORT, () => {
   } else {
     console.log("  Senha do dashboard: (definida no .env)");
   }
-  if (!igConfigured()) console.log("  [aviso] Instagram por configurar (IG_USER_ID / IG_ACCESS_TOKEN).");
+  if (!igConfigured()) console.log("  [aviso] Instagram por configurar (PAGE_ID / PAGE_ACCESS_TOKEN).");
   if (!fbConfigured()) console.log("  [aviso] Facebook por configurar (PAGE_ACCESS_TOKEN).");
 
   // Reclassifica eventos antigos com a estratégia atual das regras.
   const n = backfillEventStrategies();
   if (n) console.log(`  [funil] ${n} eventos reclassificados por estratégia`);
 
-  // Auto-renova o token IG (só renova de facto se já passaram >2 dias) e depois
-  // garante a subscricao da conta aos webhooks de comentarios (idempotente).
+  // -------------------------------------------------------------------------
+  //  Instagram por SONDAGEM. A Meta so entrega webhooks de comentarios do
+  //  Instagram a apps com Advanced Access (App Review), por isso vamos nos
+  //  buscar os comentarios de X em X segundos. O Facebook continua por webhook.
+  // -------------------------------------------------------------------------
   if (igConfigured()) {
-    const renovaEsubscreve = () =>
-      refreshIgToken()
+    const cada = Math.max(20, Number(process.env.IG_POLL_SECONDS) || 60);
+    const sondar = () =>
+      pollInstagramComments()
         .then((r) => {
-          if (r.ok && !r.skipped) console.log(`  [ig] token renovado (+${r.expiresInDays} dias)`);
-          else if (!r.ok) console.warn(`  [ig] renovacao falhou: ${r.error}`);
-          return igSubscribeApp();
+          if (!r.ok) console.warn(`  [ig-poll] falhou: ${r.error}`);
+          else if (r.handled) console.log(`  [ig-poll] ${r.handled} comentario(s) novo(s) tratados`);
         })
-        .then((r) =>
-          console.log(r.ok ? "  [ig] conta subscrita aos comentarios ✓" : `  [ig] subscricao falhou: ${r.error}`)
-        );
-    renovaEsubscreve();
-    // Volta a tentar renovar 1x por dia enquanto o servico estiver de pe.
-    setInterval(() => refreshIgToken().then((r) => {
-      if (r.ok && !r.skipped) console.log(`  [ig] token renovado (+${r.expiresInDays} dias)`);
-    }), 24 * 60 * 60 * 1000);
+        .catch((e) => console.error("  [ig-poll]", e.message));
+    console.log(`  [ig] sondagem de comentarios a cada ${cada}s`);
+    sondar();
+    setInterval(sondar, cada * 1000);
   }
 });
