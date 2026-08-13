@@ -278,20 +278,21 @@
 
       /* Escolher a publicação a que a automação se aplica */
       .media-picker {
-        display: grid; grid-auto-flow: column; grid-auto-columns: 96px; gap: 8px;
-        overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: thin;
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(122px, 1fr)); gap: 10px;
+        max-height: 340px; overflow-y: auto; padding: 2px; scrollbar-width: thin;
       }
       .media-tile {
-        position: relative; padding: 0; border: 2px solid var(--line); border-radius: 10px;
+        position: relative; padding: 0; border: 2px solid var(--line); border-radius: 12px;
         background: var(--surface); cursor: pointer; overflow: hidden; text-align: left;
-        display: flex; flex-direction: column; height: 128px; transition: border-color .15s;
+        display: flex; flex-direction: column; height: 178px; transition: border-color .15s, transform .12s;
       }
+      .media-tile:hover { transform: translateY(-2px); }
       .media-tile:hover { border-color: var(--primary); }
       .media-tile[aria-pressed="true"] { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(91,91,214,.15); }
-      .media-tile img { width: 100%; height: 88px; object-fit: cover; display: block; background: var(--bg); }
+      .media-tile img { width: 100%; height: 128px; object-fit: cover; display: block; background: var(--bg); }
       .media-tile .mt-cap {
-        font-size: 10px; line-height: 1.25; color: var(--muted); padding: 4px 5px;
-        overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+        font-size: 10.5px; line-height: 1.3; color: var(--muted); padding: 6px 7px;
+        overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
       }
       .media-tile .mt-n {
         position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,.65); color: #fff;
@@ -300,7 +301,101 @@
       .media-tile.all { align-items: center; justify-content: center; gap: 6px; }
       .media-tile.all .mt-ico { font-size: 24px; }
       .media-tile.all span { font-size: 11px; font-weight: 700; color: var(--ink); padding: 0 6px; text-align: center; }
-      .media-empty { font-size: 12px; color: var(--muted); padding: 10px 0; }
+      .media-empty { font-size: 12px; color: var(--muted); padding: 10px 0; grid-column: 1 / -1; }
+
+      /* ---------- Assistente por passos ---------- */
+      .wiz-steps {
+        display: flex; gap: 4px; padding: 12px 22px; border-bottom: 1px solid var(--line);
+        background: var(--bg); overflow-x: auto;
+      }
+      .wiz-step {
+        display: flex; align-items: center; gap: 7px; border: 0; background: none; cursor: pointer;
+        padding: 6px 12px; border-radius: 20px; font: inherit; font-size: 12.5px; font-weight: 600;
+        color: var(--muted); white-space: nowrap; transition: background .15s, color .15s;
+      }
+      .wiz-step i {
+        display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
+        background: var(--line); color: var(--muted); font-size: 11px; font-weight: 800; font-style: normal;
+      }
+      .wiz-step:hover { background: var(--surface); color: var(--ink); }
+      .wiz-step.is-on { background: var(--primary-soft); color: var(--primary-dark); }
+      .wiz-step.is-on i { background: var(--primary); color: #fff; }
+      .wiz-step.done i { background: var(--ok); color: #fff; }
+
+      .wiz-main { min-width: 0; }
+      .wiz-pane[hidden] { display: none; }
+      .wiz-h { font-size: 17px; font-weight: 700; margin: 0 0 4px; color: var(--ink); }
+      .wiz-sub { font-size: 12.5px; color: var(--muted); margin: 0 0 16px; line-height: 1.5; }
+      .wiz-rowhead { display: flex; align-items: flex-start; gap: 16px; }
+      .wiz-rowhead > div { flex: 1; min-width: 0; }
+      .wiz-count { font-size: 12px; color: var(--muted); font-weight: 600; }
+      .wiz-search {
+        width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px;
+        font-size: 13px; font-family: inherit; background: var(--surface); color: var(--ink); margin-bottom: 10px;
+      }
+      .wiz-search:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(91,91,214,.15); }
+
+      /* ---------- Campos repetíveis (palavras / respostas) ---------- */
+      .rep-list { display: flex; flex-direction: column; gap: 8px; }
+      .rep-row { display: flex; gap: 8px; align-items: flex-start; }
+      .rep-row textarea, .rep-row input[type="text"] {
+        flex: 1; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+        font-size: 14px; font-family: inherit; background: var(--surface); color: var(--ink);
+        resize: vertical; line-height: 1.5;
+      }
+      .rep-row textarea { min-height: 52px; }
+      .rep-row textarea:focus, .rep-row input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(91,91,214,.15); }
+      .rep-del {
+        flex: 0 0 auto; width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 10px;
+        background: var(--surface); color: var(--muted); cursor: pointer; font-size: 15px;
+      }
+      .rep-del:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-soft); }
+      .rep-add {
+        margin-top: 10px; border: 1px dashed var(--line); background: none; color: var(--primary-dark);
+        border-radius: 10px; padding: 9px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+      }
+      .rep-add:hover { border-color: var(--primary); background: var(--primary-soft); }
+
+      /* ---------- Interruptores ---------- */
+      .tgl { flex: 0 0 auto; cursor: pointer; }
+      .tgl input { position: absolute; opacity: 0; pointer-events: none; }
+      .tgl span {
+        display: block; width: 44px; height: 25px; border-radius: 20px; background: var(--line);
+        position: relative; transition: background .18s;
+      }
+      .tgl span::after {
+        content: ""; position: absolute; top: 3px; left: 3px; width: 19px; height: 19px;
+        border-radius: 50%; background: #fff; transition: transform .18s; box-shadow: 0 1px 3px rgba(0,0,0,.25);
+      }
+      .tgl input:checked + span { background: var(--ok); }
+      .tgl input:checked + span::after { transform: translateX(19px); }
+      .opt-row {
+        display: flex; align-items: center; gap: 16px; padding: 12px 0; border-top: 1px solid var(--line);
+      }
+      .opt-row b { display: block; font-size: 13.5px; color: var(--ink); }
+      .opt-row small { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+      .is-off { opacity: .4; pointer-events: none; }
+
+      /* ---------- Pré-visualização em telemóvel ---------- */
+      .phone {
+        border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
+        background: var(--surface); box-shadow: 0 6px 20px rgba(0,0,0,.07);
+      }
+      .ph-head {
+        display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+        border-bottom: 1px solid var(--line); background: var(--bg);
+      }
+      .ph-av {
+        width: 26px; height: 26px; border-radius: 50%; flex: 0 0 auto;
+        background: linear-gradient(135deg, #f9ce34, #ee2a7b, #6228d7);
+      }
+      .ph-head b { font-size: 12.5px; color: var(--ink); }
+      .ph-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+      .ph-empty { color: var(--muted); font-style: italic; }
+      .dm-sep {
+        font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+        text-align: center; margin: 10px 0 2px; font-weight: 700;
+      }
       .var-chip:active { transform: scale(0.96); }
 
       .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -451,10 +546,22 @@
           <button class="icon-btn" id="editor-close" aria-label="Fechar">✕</button>
         </div>
         <form id="editor-form">
+          <!-- Barra dos passos (clicável para saltar) -->
+          <div class="wiz-steps" id="wiz-steps">
+            <button type="button" class="wiz-step is-on" data-goto="1"><i>1</i><span>Onde</span></button>
+            <button type="button" class="wiz-step" data-goto="2"><i>2</i><span>Publicação</span></button>
+            <button type="button" class="wiz-step" data-goto="3"><i>3</i><span>Palavras</span></button>
+            <button type="button" class="wiz-step" data-goto="4"><i>4</i><span>Respostas</span></button>
+            <button type="button" class="wiz-step" data-goto="5"><i>5</i><span>Mensagem</span></button>
+          </div>
+
           <div class="modal-body">
-            <div>
-              <div class="field">
-                <label>Onde</label>
+            <div class="wiz-main">
+              <!-- ===================== PASSO 1 ===================== -->
+              <section class="wiz-pane" data-step="1">
+                <h3 class="wiz-h">Onde é que esta automação funciona?</h3>
+                <p class="wiz-sub">Escolhe a rede onde estão os comentários que queres responder.</p>
+                <div class="field">
                 <div class="seg" id="seg-platform">
                   <span>
                     <input type="radio" name="platform" value="ig" id="plat-ig" checked />
@@ -471,24 +578,29 @@
                     </label>
                   </span>
                 </div>
-              </div>
-              <div class="field">
-                <label>Publicação</label>
+                </div>
+              </section>
+
+              <!-- ===================== PASSO 2 ===================== -->
+              <section class="wiz-pane" data-step="2" hidden>
+                <h3 class="wiz-h">Que publicação queres automatizar?</h3>
+                <p class="wiz-sub">Assim podes usar a mesma palavra em publicações diferentes, cada uma com o seu link.</p>
+                <input type="search" class="wiz-search" id="media-search" placeholder="Procurar pela legenda…" autocomplete="off" />
                 <div class="media-picker" id="media-picker">
                   <button type="button" class="media-tile all" data-media="" aria-pressed="true">
                     <span class="mt-ico">🌐</span><span>Todas as publicações</span>
                   </button>
                 </div>
                 <input type="hidden" id="f-media" name="media_id" value="" />
-                <div class="hint">Escolhe a publicação onde esta automação funciona. Assim podes usar a mesma palavra em publicações diferentes, cada uma com o seu link.</div>
-              </div>
-              <div class="grid2">
-                <div class="field">
-                  <label for="f-keyword">Palavra(s) que disparam</label>
-                  <input type="text" id="f-keyword" name="keyword" placeholder="QUERO, KERO, QUERO JÁ" autocomplete="off" />
-                  <div class="hint">Separa variações com vírgula — basta uma aparecer. Maiúsculas e acentos não contam.</div>
-                </div>
-                <div class="field">
+              </section>
+
+              <!-- ===================== PASSO 3 ===================== -->
+              <section class="wiz-pane" data-step="3" hidden>
+                <h3 class="wiz-h">Que palavras ativam a automação?</h3>
+                <p class="wiz-sub">Acrescenta as variações que as pessoas escrevem — basta uma aparecer. Maiúsculas e acentos não contam.</p>
+                <div class="rep-list" id="kw-list"></div>
+                <button type="button" class="rep-add" id="kw-add">＋ Adicionar mais uma palavra</button>
+                <div class="field" style="max-width:280px;margin-top:16px">
                   <label for="f-match">Como detetar</label>
                   <select id="f-match" name="match_type">
                     <option value="contains">Contém a palavra</option>
@@ -496,47 +608,85 @@
                     <option value="starts">Começa pela palavra</option>
                   </select>
                 </div>
-              </div>
-              <div class="field">
-                <label for="f-reply">Resposta no comentário</label>
-                <textarea id="f-reply" name="reply_public" placeholder="Olá {nome}! Enviei-te DM 💌 Vê a tua caixa de mensagens."></textarea>
-                <div class="hint">Deixa vazio para não responder publicamente. <button type="button" class="var-chip" data-insert="f-reply">＋ {nome}</button> insere o nome de quem comentou.</div>
-              </div>
-              <div class="field" id="f-dm-field">
-                <label for="f-dm">Mensagem privada (DM)</label>
-                <textarea id="f-dm" name="dm_text" placeholder="Olá {nome}! 👋 Aqui está o link que pediste: https://…"></textarea>
-                <div class="hint">Enviada uma única vez por comentário (regra do Instagram). <button type="button" class="var-chip" data-insert="f-dm">＋ {nome}</button></div>
-              </div>
-              <div class="grid2" style="border-top:1px solid var(--line);padding-top:14px">
-                <div class="field">
-                  <label for="f-strategy">Estratégia</label>
-                  <input type="text" id="f-strategy" name="strategy" list="strategy-list" placeholder="Receita" autocomplete="off" />
-                  <datalist id="strategy-list"></datalist>
-                  <div class="hint">Agrupa o funil. Usa o mesmo nome em regras da mesma campanha.</div>
+              </section>
+
+              <!-- ===================== PASSO 4 ===================== -->
+              <section class="wiz-pane" data-step="4" hidden>
+                <div class="wiz-rowhead">
+                  <div>
+                    <h3 class="wiz-h">Responder ao comentário?</h3>
+                    <p class="wiz-sub">Se puseres várias, escolhemos uma ao acaso de cada vez — é o que evita parecer spam.</p>
+                  </div>
+                  <label class="tgl"><input type="checkbox" id="t-reply" checked /><span></span></label>
                 </div>
-                <div class="field">
-                  <label for="f-step-label">Nome do passo do meio</label>
-                  <input type="text" id="f-step-label" name="step_label" placeholder="Clicaram ver as 500 receitas" autocomplete="off" />
-                  <div class="hint">Ex.: "Concluíram o quiz". Como aparece no funil.</div>
+                <div id="reply-wrap">
+                  <div class="rep-list" id="rep-list"></div>
+                  <button type="button" class="rep-add" id="rep-add">＋ Adicionar mais uma resposta</button>
+                  <div class="hint" style="margin-top:8px"><button type="button" class="var-chip" data-insert="__last-reply">＋ {nome}</button> insere o nome de quem comentou.</div>
                 </div>
-              </div>
+              </section>
+
+              <!-- ===================== PASSO 5 ===================== -->
+              <section class="wiz-pane" data-step="5" hidden>
+                <div class="wiz-rowhead">
+                  <div>
+                    <h3 class="wiz-h">Enviar mensagem privada (DM)</h3>
+                    <p class="wiz-sub">É aqui que o link fica clicável — nos comentários de anúncios não fica.</p>
+                  </div>
+                  <label class="tgl"><input type="checkbox" id="t-dm" checked /><span></span></label>
+                </div>
+                <div id="dm-wrap">
+                  <div class="field">
+                    <textarea id="f-dm" name="dm_text" rows="6" placeholder="Olá {nome}! 👋 Aqui está o link que pediste: https://…"></textarea>
+                    <div class="hint">Enviada uma única vez por comentário (regra da Meta). <button type="button" class="var-chip" data-insert="f-dm">＋ {nome}</button></div>
+                  </div>
+                </div>
+
+                <div class="opt-row">
+                  <div><b>Responder a cada pessoa só uma vez</b><small>Quem comentar várias vezes recebe só uma resposta.</small></div>
+                  <label class="tgl"><input type="checkbox" id="t-once" /><span></span></label>
+                </div>
+
+                <div class="grid2" style="border-top:1px solid var(--line);padding-top:14px;margin-top:14px">
+                  <div class="field">
+                    <label for="f-strategy">Estratégia</label>
+                    <input type="text" id="f-strategy" name="strategy" list="strategy-list" placeholder="Receita" autocomplete="off" />
+                    <datalist id="strategy-list"></datalist>
+                    <div class="hint">Agrupa o funil. Usa o mesmo nome em regras da mesma campanha.</div>
+                  </div>
+                  <div class="field">
+                    <label for="f-step-label">Nome do passo do meio</label>
+                    <input type="text" id="f-step-label" name="step_label" placeholder="Clicaram ver as 500 receitas" autocomplete="off" />
+                    <div class="hint">Ex.: "Concluíram o quiz". Como aparece no funil.</div>
+                  </div>
+                </div>
+              </section>
             </div>
 
+            <!-- Pré-visualização em telemóvel -->
             <aside class="preview" id="preview">
               <div class="plabel">Pré-visualização</div>
-              <div class="bubble them"><span class="who">@cliente</span><span id="pv-comment">QUERO</span></div>
-              <div class="bubble us" id="pv-reply-wrap"><span class="who">a tua página</span><span id="pv-reply" class="ph">sem resposta pública</span></div>
-              <div class="dm-block" id="pv-dm-block">
-                <hr />
-                <div class="plabel">Na caixa de mensagens</div>
-                <div class="bubble dm"><span class="who">a tua página</span><span id="pv-dm" class="ph">sem mensagem privada</span></div>
+              <div class="phone">
+                <div class="ph-head"><span class="ph-av" id="pv-avatar"></span><b id="pv-account">a tua página</b></div>
+                <div class="ph-body">
+                  <div class="bubble them"><span class="who">@cliente</span><span id="pv-comment">QUERO</span></div>
+                  <div class="bubble us" id="pv-reply-wrap"><span class="who" id="pv-who">a tua página</span><span id="pv-reply" class="ph-empty">sem resposta pública</span></div>
+                  <div class="dm-block" id="pv-dm-block">
+                    <div class="dm-sep">na caixa de mensagens</div>
+                    <div class="bubble dm"><span id="pv-dm" class="ph-empty">sem mensagem privada</span></div>
+                  </div>
+                </div>
               </div>
             </aside>
           </div>
           <div class="modal-foot">
-            <button type="submit" class="btn btn-primary" id="editor-save">Guardar automação</button>
-            <button type="button" class="btn btn-ghost" id="editor-cancel">Cancelar</button>
+            <span class="wiz-count" id="wiz-count">passo 1 de 5</span>
+            <div class="spacer"></div>
             <span class="msg" id="editor-msg"></span>
+            <button type="button" class="btn btn-ghost" id="editor-cancel">Cancelar</button>
+            <button type="button" class="btn btn-ghost" id="wiz-back" hidden>Voltar</button>
+            <button type="button" class="btn btn-primary" id="wiz-next">Próximo</button>
+            <button type="submit" class="btn btn-primary" id="editor-save" hidden>Guardar automação</button>
           </div>
         </form>
       </div>

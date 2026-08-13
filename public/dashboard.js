@@ -411,7 +411,12 @@ function bindEditor() {
   // Chips "＋ {nome}": inserem a variável na posição do cursor.
   editorForm.querySelectorAll(".var-chip").forEach((chip) => {
     chip.addEventListener("click", () => {
-      const ta = document.getElementById(chip.dataset.insert);
+      // "__last-reply" = a última caixa de resposta que o utilizador tocou.
+      const ta =
+        chip.dataset.insert === "__last-reply"
+          ? ultimaCaixaResposta()
+          : document.getElementById(chip.dataset.insert);
+      if (!ta) return;
       const pos = ta.selectionStart ?? ta.value.length;
       ta.value = ta.value.slice(0, pos) + "{nome}" + ta.value.slice(ta.selectionEnd ?? pos);
       ta.focus();
@@ -420,22 +425,66 @@ function bindEditor() {
     });
   });
 
+  // Navegação do assistente.
+  document.getElementById("wiz-next").addEventListener("click", () => {
+    if (!validaPasso(wizStep)) return;
+    goStep(wizStep + 1);
+  });
+  document.getElementById("wiz-back").addEventListener("click", () => goStep(wizStep - 1));
+  document.querySelectorAll(".wiz-step").forEach((b) => {
+    b.addEventListener("click", () => goStep(Number(b.dataset.goto)));
+  });
+
+  // Botões "adicionar mais".
+  document.getElementById("kw-add").addEventListener("click", () => {
+    repAdd("kw-list", "", "ex.: RECEITA").focus();
+  });
+  document.getElementById("rep-add").addEventListener("click", () => {
+    repAdd("rep-list", "", "ex.: Enviei-te mensagem privada! 💌").focus();
+  });
+
+  // Interruptores ligam/desligam os blocos respetivos.
+  const liga = (chk, wrap) => {
+    const on = document.getElementById(chk).checked;
+    document.getElementById(wrap).classList.toggle("is-off", !on);
+    syncPreview();
+  };
+  document.getElementById("t-reply").addEventListener("change", () => liga("t-reply", "reply-wrap"));
+  document.getElementById("t-dm").addEventListener("change", () => liga("t-dm", "dm-wrap"));
+
+  // Procurar publicação pela legenda.
+  document.getElementById("media-search").addEventListener("input", (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll("#media-picker .media-tile:not(.all)").forEach((t) => {
+      t.hidden = q ? !(t.getAttribute("title") || "").toLowerCase().includes(q) : false;
+    });
+  });
+
   editorForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const msg = document.getElementById("editor-msg");
+    const palavras = repValues("kw-list");
+    const respostas = document.getElementById("t-reply").checked ? repValues("rep-list") : [];
+    const dm = document.getElementById("t-dm").checked ? document.getElementById("f-dm").value.trim() : "";
+
     const body = {
       ...(editingId ? { id: editingId } : {}),
       platform: editorForm.platform.value,
-      keyword: editorForm.keyword.value.trim(),
+      // No servidor as variações continuam separadas por vírgula.
+      keyword: palavras.join(", "),
       match_type: editorForm.match_type.value,
-      reply_public: editorForm.reply_public.value.trim(),
-      dm_text: editorForm.dm_text.value.trim(),
+      // A 1ª resposta fica em reply_public (compatibilidade e listagens);
+      // a lista completa vai em replies_json e é sorteada a cada comentário.
+      reply_public: respostas[0] || "",
+      replies_json: respostas.length > 1 ? JSON.stringify(respostas) : "",
+      dm_text: dm,
       strategy: editorForm.strategy.value.trim(),
       step_label: editorForm.step_label.value.trim(),
       media_id: document.getElementById("f-media").value,
+      once_per_user: document.getElementById("t-once").checked ? 1 : 0,
     };
-    if (!body.keyword) { msg.textContent = "Falta a palavra que dispara."; return; }
-    if (!body.reply_public && !body.dm_text) { msg.textContent = "Escreve pelo menos a resposta ou a DM."; return; }
+    if (!body.keyword) { msg.textContent = "Falta a palavra que dispara (passo 3)."; goStep(3); return; }
+    if (!body.reply_public && !body.dm_text) { msg.textContent = "Escreve pelo menos uma resposta ou a mensagem privada."; return; }
     msg.textContent = "";
     const r = await api("/api/automation/rules", { method: "POST", body });
     if (r && r.ok) { closeEditor(); load(); }
@@ -450,19 +499,58 @@ function openEditor(rule) {
   document.getElementById("editor-msg").textContent = "";
   editorForm.reset();
   editorForm.platform.value = rule?.platform || "ig";
-  editorForm.keyword.value = rule?.keyword || "";
   editorForm.match_type.value = rule?.match_type || "contains";
-  editorForm.reply_public.value = rule?.reply_public || "";
-  editorForm.dm_text.value = rule?.dm_text || "";
   editorForm.strategy.value = rule?.strategy || "";
   editorForm.step_label.value = rule?.step_label || "";
+  document.getElementById("f-dm").value = rule?.dm_text || "";
+
+  // Palavras: no servidor vêm separadas por vírgula, aqui são uma por linha.
+  repSet("kw-list", kwVariants(rule?.keyword || ""), "ex.: RECEITA");
+
+  // Respostas: se houver várias guardadas usa-as, senão a única de reply_public.
+  let respostas = [];
+  try {
+    const j = JSON.parse(rule?.replies_json || "[]");
+    if (Array.isArray(j)) respostas = j.filter(Boolean);
+  } catch { /* json inválido: ignora */ }
+  if (!respostas.length && rule?.reply_public) respostas = [rule.reply_public];
+  repSet("rep-list", respostas, "ex.: Enviei-te mensagem privada! 💌");
+
+  // Interruptores.
+  document.getElementById("t-reply").checked = rule ? Boolean(respostas.length) : true;
+  document.getElementById("t-dm").checked = rule ? Boolean(rule.dm_text) : true;
+  document.getElementById("t-once").checked = Boolean(rule?.once_per_user);
+  document.getElementById("reply-wrap").classList.toggle("is-off", !document.getElementById("t-reply").checked);
+  document.getElementById("dm-wrap").classList.toggle("is-off", !document.getElementById("t-dm").checked);
+  document.getElementById("media-search").value = "";
+  goStep(1);
   // Sugestões de estratégias já usadas (autocomplete).
   const known = [...new Set((data?.rules || []).map((r) => r.strategy).filter(Boolean))];
   document.getElementById("strategy-list").innerHTML = known.map((s) => `<option value="${escapeHtml(s)}"></option>`).join("");
   loadMedia(rule?.platform || "ig", rule?.media_id || "");
   syncPreview();
   editor.hidden = false;
-  document.getElementById("f-keyword").focus();
+}
+
+/** A última caixa de resposta tocada (para o chip "＋ {nome}"). */
+let ultimaResposta = null;
+function ultimaCaixaResposta() {
+  const caixas = [...document.querySelectorAll("#rep-list .rep-row textarea")];
+  return caixas.includes(ultimaResposta) ? ultimaResposta : caixas[caixas.length - 1] || null;
+}
+document.addEventListener("focusin", (e) => {
+  if (e.target.matches("#rep-list .rep-row textarea")) ultimaResposta = e.target;
+});
+
+/** Valida o passo antes de deixar avançar. */
+function validaPasso(n) {
+  const msg = document.getElementById("editor-msg");
+  msg.textContent = "";
+  if (n === 3 && !repValues("kw-list").length) {
+    msg.textContent = "Escreve pelo menos uma palavra.";
+    return false;
+  }
+  return true;
 }
 
 function closeEditor() {
@@ -526,25 +614,97 @@ function applyTemplate(text, name) {
 // Pré-visualização ao vivo: comentário → resposta → DM, como no Instagram.
 function syncPreview() {
   const isFb = editorForm.platform.value === "fb";
-  document.getElementById("f-dm-field").hidden = isFb;
-  document.getElementById("pv-dm-block").hidden = isFb;
+  document.getElementById("pv-account").textContent = isFb ? "a tua Página" : "a tua conta";
+  document.getElementById("pv-who").textContent = isFb ? "a tua Página" : "a tua conta";
+  document.getElementById("pv-avatar").style.background = isFb
+    ? "#1877f2"
+    : "linear-gradient(135deg,#f9ce34,#ee2a7b,#6228d7)";
 
-  // Com variações ("QUERO, KERO"), o comentário de exemplo usa a primeira.
-  const kw = kwVariants(editorForm.keyword.value)[0] || "";
+  // O comentário de exemplo usa a primeira palavra escrita.
+  const kw = repValues("kw-list")[0] || "";
   // O comentador de exemplo chama-se "cliente" — é isso que o {nome} vira aqui.
-  const reply = applyTemplate(editorForm.reply_public.value.trim(), "cliente");
-  const dm = applyTemplate(editorForm.dm_text.value.trim(), "cliente");
+  const respostas = repValues("rep-list");
+  const reply = document.getElementById("t-reply").checked
+    ? applyTemplate(respostas[0] || "", "cliente")
+    : "";
+  const dm = document.getElementById("t-dm").checked
+    ? applyTemplate(document.getElementById("f-dm").value.trim(), "cliente")
+    : "";
 
   document.getElementById("pv-comment").textContent = kw || "palavra-chave";
   setBubble("pv-reply", reply, "sem resposta pública");
   setBubble("pv-dm", dm, "sem mensagem privada");
   document.getElementById("pv-reply-wrap").hidden = false;
+
+  // Quantas respostas diferentes existem (mostra que vão sair à vez).
+  const extra = document.getElementById("pv-extra");
+  if (extra) extra.textContent = respostas.length > 1 ? `+${respostas.length - 1} variações` : "";
 }
 
 function setBubble(id, text, placeholder) {
   const el = document.getElementById(id);
   el.textContent = text || placeholder;
-  el.classList.toggle("ph", !text);
+  el.classList.toggle("ph-empty", !text);
+}
+
+// ---- Assistente por passos ---------------------------------------------------
+let wizStep = 1;
+const WIZ_TOTAL = 5;
+
+function goStep(n) {
+  wizStep = Math.min(WIZ_TOTAL, Math.max(1, n));
+  document.querySelectorAll(".wiz-pane").forEach((p) => {
+    p.hidden = Number(p.dataset.step) !== wizStep;
+  });
+  document.querySelectorAll(".wiz-step").forEach((b) => {
+    const i = Number(b.dataset.goto);
+    b.classList.toggle("is-on", i === wizStep);
+    b.classList.toggle("done", i < wizStep);
+  });
+  document.getElementById("wiz-count").textContent = `passo ${wizStep} de ${WIZ_TOTAL}`;
+  document.getElementById("wiz-back").hidden = wizStep === 1;
+  document.getElementById("wiz-next").hidden = wizStep === WIZ_TOTAL;
+  document.getElementById("editor-save").hidden = wizStep !== WIZ_TOTAL;
+  document.getElementById("editor-msg").textContent = "";
+}
+
+// ---- Campos repetíveis (palavras e respostas) --------------------------------
+/** Textos preenchidos de uma lista repetível, pela ordem em que aparecem. */
+function repValues(listId) {
+  return [...document.querySelectorAll(`#${listId} .rep-row textarea`)]
+    .map((t) => t.value.trim())
+    .filter(Boolean);
+}
+
+/** Cria uma linha nova na lista (com botão de apagar). */
+function repAdd(listId, value = "", placeholder = "") {
+  const list = document.getElementById(listId);
+  const row = document.createElement("div");
+  row.className = "rep-row";
+  const ta = document.createElement("textarea");
+  ta.rows = listId === "kw-list" ? 1 : 2;
+  ta.value = value;
+  ta.placeholder = placeholder;
+  const del = document.createElement("button");
+  del.type = "button";
+  del.className = "rep-del";
+  del.title = "Remover";
+  del.textContent = "🗑";
+  del.addEventListener("click", () => {
+    row.remove();
+    if (!document.querySelectorAll(`#${listId} .rep-row`).length) repAdd(listId, "", placeholder);
+    syncPreview();
+  });
+  row.append(ta, del);
+  list.appendChild(row);
+  return ta;
+}
+
+/** Reconstrói uma lista repetível a partir de um array de textos. */
+function repSet(listId, values, placeholder) {
+  document.getElementById(listId).innerHTML = "";
+  const vals = values && values.length ? values : [""];
+  vals.forEach((v) => repAdd(listId, v, placeholder));
 }
 
 // ---- Utilitários ------------------------------------------------------------

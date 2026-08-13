@@ -203,6 +203,8 @@ app.post("/api/automation/rules", requireDash, (req, res) => {
       ...(b.strategy != null ? { strategy: b.strategy } : {}),
       ...(b.step_label != null ? { step_label: b.step_label } : {}),
       ...(b.media_id != null ? { media_id: b.media_id } : {}),
+      ...(b.replies_json != null ? { replies_json: b.replies_json } : {}),
+      ...(b.once_per_user != null ? { once_per_user: b.once_per_user } : {}),
     });
     // Etiquetar uma regra reclassifica logo os eventos antigos que ela gerou.
     backfillEventStrategies();
@@ -218,6 +220,8 @@ app.post("/api/automation/rules", requireDash, (req, res) => {
     strategy: b.strategy || "",
     step_label: b.step_label || "",
     media_id: b.media_id || "",
+    replies_json: b.replies_json || "",
+    once_per_user: b.once_per_user || 0,
   });
   if (!id) return res.status(500).json({ ok: false, error: "Não foi possível criar a regra." });
   backfillEventStrategies();
