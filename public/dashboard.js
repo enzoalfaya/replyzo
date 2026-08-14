@@ -17,6 +17,7 @@ let currentView = "overview";
 let editingId = null; // id da regra em edicao (null = nova)
 let armedDelete = null; // { id, timer } — apagar em dois passos
 let funnelStrategy = null; // estratégia selecionada no funil (null = todas)
+let periodo = 0; // dias que as métricas abrangem (0 = desde sempre)
 
 const VIEW_TITLES = {
   overview: ["Visão geral", "Comentários → resposta + DM, em piloto automático"],
@@ -63,7 +64,9 @@ function showGate(errMsg) {
 async function load() {
   if (!data) mainView.innerHTML = `<div class="card"><div class="empty">A carregar…</div></div>`;
   try {
-    const res = await fetch("/api/automation", {
+    // `periodo` = quantos dias para trás as métricas contam (0 = desde sempre).
+    const desde = periodo ? Math.floor(Date.now() / 1000) - periodo * 86400 : 0;
+    const res = await fetch(`/api/automation${desde ? `?since=${desde}` : ""}`, {
       headers: { "x-dash-key": sessionStorage.getItem(KEY_STORE) || "" },
     });
     if (res.status === 401) { sessionStorage.removeItem(KEY_STORE); showGate("Senha incorreta. Tenta de novo."); return; }
@@ -131,6 +134,20 @@ async function onMainClick(e) {
   const edit = e.target.closest("button[data-edit]");
   if (edit) { openEditor(data.rules.find((r) => r.id === Number(edit.dataset.edit))); return; }
 
+  // Duplicar: cria uma cópia DESLIGADA e abre-a logo para editares.
+  const dup = e.target.closest("button[data-dup]");
+  if (dup) {
+    dup.disabled = true;
+    const r = await api(`/api/automation/rules/${dup.dataset.dup}/duplicate`, { method: "POST" });
+    await load();
+    if (r && r.ok && r.rule) openEditor(r.rule);
+    return;
+  }
+
+  // Período das métricas (hoje / 7 dias / 30 dias / sempre).
+  const per = e.target.closest("button[data-period]");
+  if (per) { periodo = Number(per.dataset.period); load(); return; }
+
   const del = e.target.closest("button[data-del]");
   if (del) {
     const id = Number(del.dataset.del);
@@ -166,6 +183,23 @@ function kpisHtml() {
     <div class="kpi"><div class="k">Comentários tratados</div><div class="v">${fmtInt.format(s.total || 0)}</div><div class="d">${fmtInt.format(s.today || 0)} hoje${errNote}</div></div>
     <div class="kpi"><div class="k">DMs enviadas</div><div class="v">${fmtInt.format(s.dms || 0)}</div><div class="d">${fmtInt.format(s.clicked || 0)} abriram o link</div></div>
     <div class="kpi"><div class="k">💰 Vendas</div><div class="v">${fmtInt.format(s.purchases || 0)}</div><div class="d">${s.purchases ? fmtEur.format((s.revenue || 0) / 100) + " atribuídos" : "dos comentários"}</div></div>
+  </div>`;
+}
+
+// ---- Período das métricas ----------------------------------------------------
+const PERIODOS = [
+  { d: 1, nome: "Hoje" },
+  { d: 7, nome: "7 dias" },
+  { d: 30, nome: "30 dias" },
+  { d: 0, nome: "Desde sempre" },
+];
+
+function periodoHtml() {
+  return `<div class="periodo">
+    ${PERIODOS.map(
+      (p) =>
+        `<button type="button" data-period="${p.d}" class="${p.d === periodo ? "is-on" : ""}">${p.nome}</button>`
+    ).join("")}
   </div>`;
 }
 
@@ -330,6 +364,7 @@ function renderOverview() {
   const recent = (data.events || []).slice(0, 6);
   mainView.innerHTML = `
     ${setupNoticeHtml()}
+    ${periodoHtml()}
     ${kpisHtml()}
     ${platformsHtml()}
     ${chartHtml()}
@@ -377,6 +412,9 @@ function ruleRowHtml(r) {
       </label>
       <button class="icon-btn" data-edit="${r.id}" title="Editar" aria-label="Editar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+      </button>
+      <button class="icon-btn" data-dup="${r.id}" title="Duplicar" aria-label="Duplicar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
       </button>
       <button class="icon-btn" data-del="${r.id}" title="Apagar" aria-label="Apagar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>

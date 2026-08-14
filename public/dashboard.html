@@ -305,6 +305,16 @@
       .media-tile.all span { font-size: 11px; font-weight: 700; color: var(--ink); padding: 0 6px; text-align: center; }
       .media-empty { font-size: 12px; color: var(--muted); padding: 10px 0; grid-column: 1 / -1; }
 
+      /* ---------- Seletor de período ---------- */
+      .periodo { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+      .periodo button {
+        border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+        border-radius: 20px; padding: 6px 14px; font: inherit; font-size: 12.5px;
+        font-weight: 600; cursor: pointer; transition: all .15s;
+      }
+      .periodo button:hover { border-color: var(--primary); color: var(--primary-dark); }
+      .periodo button.is-on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
       /* ---------- Desempenho por rede ---------- */
       .plat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
       .plat-card { padding: 18px 20px; border-top: 3px solid var(--pc); }

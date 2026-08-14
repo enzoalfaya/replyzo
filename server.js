@@ -173,13 +173,13 @@ function requireDash(req, res, next) {
 // -----------------------------------------------------------------------------
 
 // Estado + lista de regras + últimos eventos + contagens (KPIs).
-app.get("/api/automation", requireDash, (_req, res) => {
+app.get("/api/automation", requireDash, (req, res) => {
   res.json({
     igConfigured: igConfigured(),
     fbConfigured: fbConfigured(),
     rules: listRules(),
     events: listAutomationEvents({ limit: 100 }),
-    stats: automationStats(),
+    stats: automationStats({ since: Number(req.query.since) || 0 }),
   });
 });
 
@@ -249,6 +249,16 @@ app.get("/api/webhooks/recent", requireDash, (_req, res) => {
     counts[k] = (counts[k] || 0) + 1;
   }
   res.json({ totals: HOOK_TOTALS, total: RECENT_HOOKS.length, counts, hooks: RECENT_HOOKS });
+});
+
+// Duplicar uma regra. A copia nasce DESLIGADA, para poderes mexer no que
+// quiseres antes de a por a responder.
+app.post("/api/automation/rules/:id/duplicate", requireDash, (req, res) => {
+  const orig = getRule(req.params.id);
+  if (!orig) return res.status(404).json({ ok: false, error: "Automação não encontrada." });
+  const id = createRule({ ...orig, active: 0 });
+  if (!id) return res.status(500).json({ ok: false, error: "Não foi possível duplicar." });
+  res.json({ ok: true, rule: getRule(id) });
 });
 
 // Apagar uma regra.
