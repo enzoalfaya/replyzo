@@ -221,7 +221,9 @@ function platformsHtml() {
     const info = PLAT_INFO[p];
     const linha = (rot, val, extra = "") =>
       `<div class="pl-line"><span>${rot}</span><b>${val}</b>${extra}</div>`;
-    const taxa = s.dms && s.clicked ? Math.round((s.clicked / s.dms) * 100) : null;
+    // A taxa é sobre quem RECEBEU link (resposta ou DM) — no Facebook a maioria
+    // dos links vai na resposta pública, por isso dividir pelas DMs dava >100%.
+    const taxa = s.withLink && s.clicked ? Math.round((s.clicked / s.withLink) * 100) : null;
     return `<div class="card plat-card" style="--pc:${info.cor}">
       <div class="pl-head">
         <span class="pl-ico">${info.icone}</span>
@@ -237,6 +239,7 @@ function platformsHtml() {
       <div class="pl-lines">
         ${linha("Respostas públicas", fmtInt.format(s.publics || 0))}
         ${linha("DMs enviadas", fmtInt.format(s.dms || 0))}
+        ${linha("Receberam link", fmtInt.format(s.withLink || 0))}
         ${linha("Abriram o link", fmtInt.format(s.clicked || 0), taxa != null ? `<em>${taxa}%</em>` : "")}
         ${linha("Vendas", fmtInt.format(s.purchases || 0), s.revenue ? `<em>${fmtEur.format(s.revenue / 100)}</em>` : "")}
         ${s.errors ? `<div class="pl-line err"><span>Erros</span><b>${fmtInt.format(s.errors)}</b></div>` : ""}
