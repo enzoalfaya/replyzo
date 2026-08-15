@@ -40,6 +40,7 @@ import {
   listMedia,
   backfillComments,
   diagnostics,
+  usoMeta,
 } from "./lib/social.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -237,7 +238,9 @@ app.post("/api/automation/rules", requireDash, (req, res) => {
 
 // Diagnóstico da saúde dos tokens (IG/FB ainda válidos junto da Meta?).
 app.get("/api/diag", requireDash, async (_req, res) => {
-  res.json(await diagnostics());
+  // Junta o consumo REAL dos limites da Meta (percentagem 0-100), para se ver
+  // com dados se ha margem para responder mais depressa.
+  res.json({ ...(await diagnostics()), uso: usoMeta() });
 });
 
 // Últimos webhooks que a Meta nos entregou (memória, desde o último arranque).
@@ -381,7 +384,7 @@ app.listen(PORT, () => {
     // 180s: com 3 publicacoes sao 4 chamadas por sondagem = 80/hora, dentro do
     // limite da Meta (~200/hora). A 60s gastavamos 360/hora e a conta era
     // bloqueada repetidamente.
-    const cada = Math.max(20, Number(process.env.IG_POLL_SECONDS) || 180);
+    const cada = Math.max(20, Number(process.env.IG_POLL_SECONDS) || 60);
     const sondar = () =>
       pollInstagramComments()
         .then((r) => {
