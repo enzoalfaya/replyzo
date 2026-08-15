@@ -378,7 +378,10 @@ app.listen(PORT, () => {
   //  buscar os comentarios de X em X segundos. O Facebook continua por webhook.
   // -------------------------------------------------------------------------
   if (igConfigured()) {
-    const cada = Math.max(20, Number(process.env.IG_POLL_SECONDS) || 60);
+    // 180s: com 3 publicacoes sao 4 chamadas por sondagem = 80/hora, dentro do
+    // limite da Meta (~200/hora). A 60s gastavamos 360/hora e a conta era
+    // bloqueada repetidamente.
+    const cada = Math.max(20, Number(process.env.IG_POLL_SECONDS) || 180);
     const sondar = () =>
       pollInstagramComments()
         .then((r) => {
